@@ -1,4 +1,4 @@
-cargo run \
+RUST_LOG=info,solana-metrics=warn cargo run \
 --package varun-validator \
 --bin varun-validator \
 -- \
@@ -29,6 +29,7 @@ cargo run \
 --rpc-send-retry-ms 2000 \
 --full-rpc-api \
 --tpu-use-quic \
+--log - \
 --known-validator PUmpKiNnSVAZ3w4KaFX6jKSjXUNHFShGkXbERo54xjb \
 --known-validator Ninja1spj6n9t5hVYgF3PdnYz2PLnkt7rvaw3firmjs \
 --known-validator ChorusmmK7i1AxXeiTtQgQZhQNiXYU84ULeaYF1EH15n \
