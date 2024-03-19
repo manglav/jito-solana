@@ -3,6 +3,9 @@ inherits = "release"
 debug = true
 split-debuginfo = "packed"
 
+[workspace.metadata.scripts]
+run_test_build = "bash test_run.sh"
+
 [workspace]
 members = [
     "account-decoder",

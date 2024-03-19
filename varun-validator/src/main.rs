@@ -2090,37 +2090,37 @@ pub fn main() {
         return;
     }
 
-    let validator = Validator::new(
-        node,
-        identity_keypair,
-        &ledger_path,
-        &vote_account,
-        authorized_voter_keypairs,
-        cluster_entrypoints,
-        &validator_config,
-        should_check_duplicate_instance,
-        rpc_to_plugin_manager_receiver,
-        start_progress,
-        socket_addr_space,
-        tpu_use_quic,
-        tpu_connection_pool_size,
-        tpu_enable_udp,
-        admin_service_post_init,
-        Some(runtime_plugin_config_and_rpc_rx),
-    )
-    .unwrap_or_else(|e| {
-        error!("Failed to start validator: {:?}", e);
-        exit(1);
-    });
-
-    if let Some(filename) = init_complete_file {
-        File::create(filename).unwrap_or_else(|_| {
-            error!("Unable to create: {}", filename);
-            exit(1);
-        });
-    }
+    // let validator = Validator::new(
+    //     node,
+    //     identity_keypair,
+    //     &ledger_path,
+    //     &vote_account,
+    //     authorized_voter_keypairs,
+    //     cluster_entrypoints,
+    //     &validator_config,
+    //     should_check_duplicate_instance,
+    //     rpc_to_plugin_manager_receiver,
+    //     start_progress,
+    //     socket_addr_space,
+    //     tpu_use_quic,
+    //     tpu_connection_pool_size,
+    //     tpu_enable_udp,
+    //     admin_service_post_init,
+    //     Some(runtime_plugin_config_and_rpc_rx),
+    // )
+    // .unwrap_or_else(|e| {
+    //     error!("Failed to start validator: {:?}", e);
+    //     exit(1);
+    // });
+    //
+    // if let Some(filename) = init_complete_file {
+    //     File::create(filename).unwrap_or_else(|_| {
+    //         error!("Unable to create: {}", filename);
+    //         exit(1);
+    //     });
+    // }
     info!("Validator initialized");
-    validator.join();
+    // validator.join();
     info!("Validator exiting..");
 }
 
