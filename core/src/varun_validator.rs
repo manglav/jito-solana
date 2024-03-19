@@ -28,7 +28,7 @@ use {
         },
         tip_manager::TipManagerConfig,
         tpu::{Tpu, TpuSockets, DEFAULT_TPU_COALESCE},
-        tvu::{Tvu, TvuConfig, TvuSockets},
+        tvu::{Tvu, TvuConfig, TvuSockets, },
     },
     crossbeam_channel::{bounded, unbounded, Receiver},
     lazy_static::lazy_static,
@@ -1118,22 +1118,6 @@ impl Validator {
             shred_receiver_address: config.shred_receiver_address.clone(),
         });
 
-        let waited_for_supermajority = wait_for_supermajority(
-            config,
-            Some(&mut process_blockstore),
-            &bank_forks,
-            &cluster_info,
-            rpc_override_health_check,
-            &start_progress,
-        )
-        .map_err(|err| format!("wait_for_supermajority failed: {err:?}"))?;
-
-        let ledger_metric_report_service =
-            LedgerMetricReportService::new(blockstore.clone(), exit.clone());
-
-        let wait_for_vote_to_start_leader =
-            !waited_for_supermajority && !config.no_wait_for_vote_to_start_leader;
-
         let poh_service = PohService::new(
             poh_recorder.clone(),
             &genesis_config.poh_config,
@@ -1148,35 +1132,6 @@ impl Validator {
             1,
             "New shred signal for the TVU should be the same as the clear bank signal."
         );
-
-        let vote_tracker = Arc::<VoteTracker>::default();
-
-        let (retransmit_slots_sender, retransmit_slots_receiver) = unbounded();
-        let (verified_vote_sender, verified_vote_receiver) = unbounded();
-        let (gossip_verified_vote_hash_sender, gossip_verified_vote_hash_receiver) = unbounded();
-        let (cluster_confirmed_slot_sender, cluster_confirmed_slot_receiver) = unbounded();
-
-        let rpc_completed_slots_service = RpcCompletedSlotsService::spawn(
-            completed_slots_receiver,
-            rpc_subscriptions.clone(),
-            exit.clone(),
-        );
-
-        let (banking_tracer, tracer_thread) =
-            BankingTracer::new((config.banking_trace_dir_byte_limit > 0).then_some((
-                &blockstore.banking_trace_path(),
-                exit.clone(),
-                config.banking_trace_dir_byte_limit,
-            )))
-            .map_err(|err| format!("{} [{:?}]", &err, &err))?;
-        if banking_tracer.is_enabled() {
-            info!(
-                "Enabled banking trace (dir_byte_limit: {})",
-                config.banking_trace_dir_byte_limit
-            );
-        } else {
-            info!("Disabled banking trace");
-        }
 
         let entry_notification_sender = entry_notifier_service
             .as_ref()
@@ -1224,16 +1179,6 @@ impl Validator {
             .unwrap()
         };
 
-        // Repair quic endpoint.
-        let repair_quic_endpoint_runtime = (current_runtime_handle.is_err()
-            && genesis_config.cluster_type != ClusterType::MainnetBeta)
-            .then(|| {
-                tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .thread_name("solRepairQuic")
-                    .build()
-                    .unwrap()
-            });
         let (repair_quic_endpoint, repair_quic_endpoint_sender, repair_quic_endpoint_join_handle) =
             if genesis_config.cluster_type == ClusterType::MainnetBeta {
                 let (sender, _receiver) = tokio::sync::mpsc::channel(1);

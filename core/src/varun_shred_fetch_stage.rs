@@ -5,6 +5,7 @@ use {
     bytes::Bytes,
     crossbeam_channel::{unbounded, Receiver, RecvTimeoutError, Sender},
     itertools::Itertools,
+    solana_ledger::shred::layout,
     solana_gossip::cluster_info::ClusterInfo,
     solana_ledger::shred::{should_discard_shred, ShredFetchStats},
     solana_perf::packet::{PacketBatch, PacketBatchRecycler, PacketFlags, PACKETS_PER_BATCH},
@@ -27,6 +28,12 @@ use {
         time::{Duration, Instant},
     },
 };
+use solana_ledger::{blockstore, shred};
+use solana_ledger::blockstore::MAX_DATA_SHREDS_PER_SLOT;
+use solana_ledger::shred::{ReedSolomonCache, Shredder};
+// use solana_ledger::shred::{layout, shred_code, ShredType};
+use solana_sdk::packet::Packet;
+use crate::repair::serve_repair::ShredRepairType::Shred;
 
 const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
 
@@ -47,6 +54,7 @@ impl VarunShredFetchStage {
         let mut stats = ShredFetchStats::default();
 
         for mut packet_batch in recvr {
+            println!("packetreceived1");
             if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
                 last_updated = Instant::now();
                 stats.shred_count += packet_batch.len();
@@ -55,7 +63,40 @@ impl VarunShredFetchStage {
                 // let should_drop_legacy_shreds =
                 //     |shred_slot| should_drop_legacy_shreds(shred_slot, &feature_set, &epoch_schedule);
                 // let turbine_disabled = turbine_disabled.load(Ordering::Relaxed);
+                let shreds: Vec<_> = packet_batch
+                    .iter()
+                    .filter(|p| !p.meta().discard())
+                    .filter_map(shred::layout::get_shred)
+                    .map(<[u8]>::to_vec)
+                    .filter_map(|s| shred::Shred::new_from_serialized_shred(s).ok())
+                    .collect();
+
+                // This works in the debugger
+                // shreds[0].ptr.pointer.pointer.ShredData[0]
+
+                // TODO - Might need this code to recover
+                // let reed_solomon_cache = ReedSolomonCache::default();
+                // // Test recovery
+                // for (fec_data_shreds, fec_coding_shreds) in fec_data.values().zip(fec_coding.values()) {
+                //     let first_data_index = fec_data_shreds.first().unwrap().index() as usize;
+                //     let all_shreds: Vec<solana_ledger::shred::Shred> = fec_data_shreds
+                //         .iter()
+                //         .step_by(2)
+                //         .chain(fec_coding_shreds.iter().step_by(2))
+                //         .cloned()
+                //         .collect();
+                //     let recovered_data = Shredder::try_recovery(all_shreds, &reed_solomon_cache).unwrap();
+                //     // Necessary in order to ensure the last shred in the slot
+                //     // is part of the recovered set, and that the below `index`
+                //     // calculation in the loop is correct
+
+
                 for packet in packet_batch.iter_mut().filter(|p| !p.meta().discard()) {
+                    println!("packetreceived2");
+                    if varun_should_discard_shred(packet) {
+                        println!("discarding packet")
+                    }
+
                     // if turbine_disabled
                     //     || should_discard_shred(
                     //     packet,
@@ -162,6 +203,24 @@ impl VarunShredFetchStage {
         Ok(())
     }
 }
+// Accepts shreds in the slot range [root + 1, max_slot].
+
+fn varun_should_discard_shred(
+    packet: &Packet,
+) -> bool {
+    let shred = match layout::get_shred(packet) {
+        None => {
+            return true;
+        }
+        Some(shred) => {
+            println!("inpacket");
+            let x = shred;
+            x
+        },
+    };
+    return false
+}
+
 
 fn varun_receive_quic_datagrams(
     turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,
@@ -189,6 +248,7 @@ fn varun_receive_quic_datagrams(
             .filter(|(_, _, bytes)| bytes.len() <= PACKET_DATA_SIZE)
             .zip(packet_batch.iter_mut())
             .map(|((_pubkey, addr, bytes), packet)| {
+                println!("packetreceived3");
                 *packet.meta_mut() = Meta {
                     size: bytes.len(),
                     addr: addr.ip(),

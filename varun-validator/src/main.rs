@@ -3773,8 +3773,13 @@ pub fn main() {
             max_ledger_shreds: validator_config.max_ledger_shreds,
             shred_version: node.info.shred_version(),
         },
-    );
-    print!("test123")
+    )    .unwrap_or_else(|e| {
+        error!("Failed to start validator: {:?}", e);
+        std::process::exit(1);
+    });
+    println!("starting tvu");
+    tvu.join().expect("tvu");
+    println!("test123")
 }
 
 fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {
