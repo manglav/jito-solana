@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+
+set -x
 #
 # |cargo install| of the top-level crate will not install binaries for
 # other workspace crates or native program crates.
@@ -112,6 +115,7 @@ else
     solana-log-analyzer
     solana-net-shaper
     solana-validator
+    varun-validator
     rbpf-cli
   )
 

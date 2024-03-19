@@ -112,6 +112,7 @@ members = [
     "udp-client",
     "upload-perf",
     "validator",
+    "varun-validator",
     "version",
     "vote",
     "watchtower",
