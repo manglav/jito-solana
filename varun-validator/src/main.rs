@@ -3727,34 +3727,34 @@ pub fn main() {
     let identity_keypair = Arc::new(identity_keypair);
 
     let should_check_duplicate_instance = true;
-    if !cluster_entrypoints.is_empty() {
-        bootstrap::rpc_bootstrap(
-            &node,
-            &identity_keypair,
-            &ledger_path,
-            &full_snapshot_archives_dir,
-            &incremental_snapshot_archives_dir,
-            &vote_account,
-            authorized_voter_keypairs.clone(),
-            &cluster_entrypoints,
-            &mut validator_config,
-            rpc_bootstrap_config,
-            do_port_check,
-            use_progress_bar,
-            maximum_local_snapshot_age,
-            should_check_duplicate_instance,
-            &start_progress,
-            minimal_snapshot_download_speed,
-            maximum_snapshot_download_abort,
-            socket_addr_space,
-        );
-        *start_progress.write().unwrap() = ValidatorStartProgress::Initializing;
-    }
-
-    if operation == Operation::Initialize {
-        info!("Validator ledger initialization complete");
-        return;
-    }
+    // if !cluster_entrypoints.is_empty() {
+    //     bootstrap::rpc_bootstrap(
+    //         &node,
+    //         &identity_keypair,
+    //         &ledger_path,
+    //         &full_snapshot_archives_dir,
+    //         &incremental_snapshot_archives_dir,
+    //         &vote_account,
+    //         authorized_voter_keypairs.clone(),
+    //         &cluster_entrypoints,
+    //         &mut validator_config,
+    //         rpc_bootstrap_config,
+    //         do_port_check,
+    //         use_progress_bar,
+    //         maximum_local_snapshot_age,
+    //         should_check_duplicate_instance,
+    //         &start_progress,
+    //         minimal_snapshot_download_speed,
+    //         maximum_snapshot_download_abort,
+    //         socket_addr_space,
+    //     );
+    //     *start_progress.write().unwrap() = ValidatorStartProgress::Initializing;
+    // }
+    //
+    // if operation == Operation::Initialize {
+    //     info!("Validator ledger initialization complete");
+    //     return;
+    // }
 
 
 
