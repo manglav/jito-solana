@@ -56,6 +56,7 @@ use {
     },
     tokio::sync::mpsc::Sender as AsyncSender,
 };
+use crate::varun_shred_fetch_stage::VarunShredFetchStage;
 
 pub struct Tvu {
     fetch_stage: ShredFetchStage,
@@ -72,11 +73,19 @@ pub struct Tvu {
     duplicate_shred_listener: DuplicateShredListener,
 }
 
+pub struct VarunTvu {
+    fetch_stage: VarunShredFetchStage,
+}
+
 pub struct TvuSockets {
     pub fetch: Vec<UdpSocket>,
     pub repair: UdpSocket,
     pub retransmit: Vec<UdpSocket>,
     pub ancestor_hashes_requests: UdpSocket,
+}
+
+pub struct VarunTvuSockets {
+    pub fetch: Vec<UdpSocket>,
 }
 
 #[derive(Default)]
@@ -89,6 +98,49 @@ pub struct TvuConfig {
     pub repair_whitelist: Arc<RwLock<HashSet<Pubkey>>>,
     pub wait_for_vote_to_start_leader: bool,
     pub replay_slots_concurrently: bool,
+}
+
+pub struct VarunTvuConfig {
+    pub max_ledger_shreds: Option<u64>,
+    pub shred_version: u16,
+}
+
+impl VarunTvu {
+    /// This service receives messages from a leader in the network and processes the transactions
+    /// on the bank state.
+    /// # Arguments
+    /// * `cluster_info` - The cluster_info state.
+    /// * `sockets` - fetch, repair, and retransmit sockets
+    /// * `blockstore` - the ledger itself
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        sockets: VarunTvuSockets,
+        turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,
+        exit: Arc<AtomicBool>,
+        tvu_config: VarunTvuConfig,
+    ) -> Result<Self, String> {
+        let VarunTvuSockets {
+            fetch: fetch_sockets,
+        } = sockets;
+
+        let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
+        let fetch_stage = VarunShredFetchStage::new(
+            fetch_sockets,
+            turbine_quic_endpoint_receiver,
+            tvu_config.shred_version,
+            exit.clone(),
+        );
+
+        Ok(VarunTvu {
+            fetch_stage,
+        })
+    }
+
+    pub fn join(self) -> thread::Result<()> {
+
+        self.fetch_stage.join()?;
+        Ok(())
+    }
 }
 
 impl Tvu {

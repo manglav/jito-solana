@@ -1,7 +1,4 @@
-RUST_LOG=info,solana-metrics=warn cargo run \
---package varun-validator \
---bin varun-validator \
--- \
+RUST_LOG=info,solana-metrics=warn cargo run --package varun-validator --bin varun-validator -- \
 --identity /Users/vmangla/RustroverProjects/jito-solana/rust_val.json \
 --entrypoint entrypoint.mainnet-beta.solana.com:8001 \
 --entrypoint entrypoint2.mainnet-beta.solana.com:8001 \

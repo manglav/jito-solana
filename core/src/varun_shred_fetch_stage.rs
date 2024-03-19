@@ -1,4 +1,4 @@
-//! The `shred_fetch_stage` pulls shreds from UDP sockets and sends it to a channel.
+//! The `varun_shred_fetch_stage` pulls shreds from UDP sockets and sends it to a channel.
 
 use {
     crate::repair::serve_repair::ServeRepair,
@@ -30,102 +30,50 @@ use {
 
 const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
 
-pub(crate) struct ShredFetchStage {
+pub(crate) struct VarunShredFetchStage {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-impl ShredFetchStage {
+impl VarunShredFetchStage {
     // updates packets received on a channel and sends them on another channel
     fn modify_packets(
         recvr: PacketBatchReceiver,
-        sendr: Sender<PacketBatch>,
-        bank_forks: &RwLock<BankForks>,
         shred_version: u16,
         name: &'static str,
         flags: PacketFlags,
-        repair_context: Option<(&UdpSocket, &ClusterInfo)>,
-        turbine_disabled: Arc<AtomicBool>,
     ) {
         const STATS_SUBMIT_CADENCE: Duration = Duration::from_secs(1);
         let mut last_updated = Instant::now();
-        let mut keypair = repair_context
-            .as_ref()
-            .map(|(_, cluster_info)| cluster_info.keypair().clone());
-
-        let (
-            mut last_root,
-            mut slots_per_epoch,
-            mut feature_set,
-            mut epoch_schedule,
-            mut last_slot,
-        ) = {
-            let bank_forks_r = bank_forks.read().unwrap();
-            let root_bank = bank_forks_r.root_bank();
-            (
-                root_bank.slot(),
-                root_bank.get_slots_in_epoch(root_bank.epoch()),
-                root_bank.feature_set.clone(),
-                *root_bank.epoch_schedule(),
-                bank_forks_r.highest_slot(),
-            )
-        };
         let mut stats = ShredFetchStats::default();
 
         for mut packet_batch in recvr {
             if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
                 last_updated = Instant::now();
-                let root_bank = {
-                    let bank_forks_r = bank_forks.read().unwrap();
-                    last_slot = bank_forks_r.highest_slot();
-                    bank_forks_r.root_bank()
-                };
-                feature_set = root_bank.feature_set.clone();
-                epoch_schedule = *root_bank.epoch_schedule();
-                last_root = root_bank.slot();
-                slots_per_epoch = root_bank.get_slots_in_epoch(root_bank.epoch());
-                keypair = repair_context
-                    .as_ref()
-                    .map(|(_, cluster_info)| cluster_info.keypair().clone());
-            }
-            stats.shred_count += packet_batch.len();
+                stats.shred_count += packet_batch.len();
 
-            if let Some((udp_socket, _)) = repair_context {
-                debug_assert_eq!(flags, PacketFlags::REPAIR);
-                debug_assert!(keypair.is_some());
-                if let Some(ref keypair) = keypair {
-                    ServeRepair::handle_repair_response_pings(
-                        udp_socket,
-                        keypair,
-                        &mut packet_batch,
-                        &mut stats,
-                    );
+                // Limit shreds to 2 epochs away.
+                // let should_drop_legacy_shreds =
+                //     |shred_slot| should_drop_legacy_shreds(shred_slot, &feature_set, &epoch_schedule);
+                // let turbine_disabled = turbine_disabled.load(Ordering::Relaxed);
+                for packet in packet_batch.iter_mut().filter(|p| !p.meta().discard()) {
+                    // if turbine_disabled
+                    //     || should_discard_shred(
+                    //     packet,
+                    //
+                    //     shred_version,
+                    //     should_drop_legacy_shreds,
+                    //     &mut stats,
+                    // )
+                    // {
+                    //     packet.meta_mut().set_discard(true);
+                    // } else {
+                    //     packet.meta_mut().flags.insert(flags);
+                    // }
                 }
-            }
-
-            // Limit shreds to 2 epochs away.
-            let max_slot = last_slot + 2 * slots_per_epoch;
-            let should_drop_legacy_shreds =
-                |shred_slot| should_drop_legacy_shreds(shred_slot, &feature_set, &epoch_schedule);
-            let turbine_disabled = turbine_disabled.load(Ordering::Relaxed);
-            for packet in packet_batch.iter_mut().filter(|p| !p.meta().discard()) {
-                if turbine_disabled
-                    || should_discard_shred(
-                    packet,
-                    last_root,
-                    max_slot,
-                    shred_version,
-                    should_drop_legacy_shreds,
-                    &mut stats,
-                )
-                {
-                    packet.meta_mut().set_discard(true);
-                } else {
-                    packet.meta_mut().flags.insert(flags);
-                }
-            }
-            stats.maybe_submit(name, STATS_SUBMIT_CADENCE);
-            if sendr.send(packet_batch).is_err() {
-                break;
+                // stats.maybe_submit(name, STATS_SUBMIT_CADENCE);
+                // if sendr.send(packet_batch).is_err() {
+                //     break;
+                // }
             }
         }
     }
@@ -134,14 +82,10 @@ impl ShredFetchStage {
     fn packet_modifier(
         sockets: Vec<Arc<UdpSocket>>,
         exit: Arc<AtomicBool>,
-        sender: Sender<PacketBatch>,
         recycler: PacketBatchRecycler,
-        bank_forks: Arc<RwLock<BankForks>>,
         shred_version: u16,
         name: &'static str,
         flags: PacketFlags,
-        repair_context: Option<(Arc<UdpSocket>, Arc<ClusterInfo>)>,
-        turbine_disabled: Arc<AtomicBool>,
     ) -> (Vec<JoinHandle<()>>, JoinHandle<()>) {
         let (packet_sender, packet_receiver) = unbounded();
         let streamers = sockets
@@ -162,18 +106,11 @@ impl ShredFetchStage {
         let modifier_hdl = Builder::new()
             .name("solTvuFetchPMod".to_string())
             .spawn(move || {
-                let repair_context = repair_context
-                    .as_ref()
-                    .map(|(socket, cluster_info)| (socket.as_ref(), cluster_info.as_ref()));
                 Self::modify_packets(
                     packet_receiver,
-                    sender,
-                    &bank_forks,
                     shred_version,
                     name,
                     flags,
-                    repair_context,
-                    turbine_disabled,
                 )
             })
             .unwrap();
@@ -184,13 +121,7 @@ impl ShredFetchStage {
     pub(crate) fn new(
         sockets: Vec<Arc<UdpSocket>>,
         turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,
-        repair_socket: Arc<UdpSocket>,
-        repair_quic_endpoint_receiver: Receiver<(SocketAddr, Vec<u8>)>,
-        sender: Sender<PacketBatch>,
         shred_version: u16,
-        bank_forks: Arc<RwLock<BankForks>>,
-        cluster_info: Arc<ClusterInfo>,
-        turbine_disabled: Arc<AtomicBool>,
         exit: Arc<AtomicBool>,
     ) -> Self {
         let recycler = PacketBatchRecycler::warmed(100, 1024);
@@ -198,95 +129,23 @@ impl ShredFetchStage {
         let (mut tvu_threads, tvu_filter) = Self::packet_modifier(
             sockets,
             exit.clone(),
-            sender.clone(),
             recycler.clone(),
-            bank_forks.clone(),
             shred_version,
             "shred_fetch",
             PacketFlags::empty(),
-            None, // repair_context
-            turbine_disabled.clone(),
         );
 
-        let (repair_receiver, repair_handler) = Self::packet_modifier(
-            vec![repair_socket.clone()],
-            exit.clone(),
-            sender.clone(),
-            recycler.clone(),
-            bank_forks.clone(),
-            shred_version,
-            "shred_fetch_repair",
-            PacketFlags::REPAIR,
-            Some((repair_socket, cluster_info)),
-            turbine_disabled.clone(),
-        );
-
-        tvu_threads.extend(repair_receiver);
         tvu_threads.push(tvu_filter);
-        tvu_threads.push(repair_handler);
-        // Repair shreds fetched over QUIC protocol.
-        {
-            let (packet_sender, packet_receiver) = unbounded();
-            let bank_forks = bank_forks.clone();
-            let recycler = recycler.clone();
-            let exit = exit.clone();
-            let sender = sender.clone();
-            let turbine_disabled = turbine_disabled.clone();
-            tvu_threads.extend([
-                Builder::new()
-                    .name("solTvuRecvRpr".to_string())
-                    .spawn(|| {
-                        receive_repair_quic_packets(
-                            repair_quic_endpoint_receiver,
-                            packet_sender,
-                            recycler,
-                            exit,
-                        )
-                    })
-                    .unwrap(),
-                Builder::new()
-                    .name("solTvuFetchRpr".to_string())
-                    .spawn(move || {
-                        Self::modify_packets(
-                            packet_receiver,
-                            sender,
-                            &bank_forks,
-                            shred_version,
-                            "shred_fetch_repair_quic",
-                            PacketFlags::REPAIR,
-                            None, // repair_context; no ping packets!
-                            turbine_disabled,
-                        )
-                    })
-                    .unwrap(),
-            ]);
-        }
+
         // Turbine shreds fetched over QUIC protocol.
-        let (packet_sender, packet_receiver) = unbounded();
         tvu_threads.extend([
             Builder::new()
                 .name("solTvuRecvQuic".to_string())
                 .spawn(|| {
-                    receive_quic_datagrams(
+                    varun_receive_quic_datagrams(
                         turbine_quic_endpoint_receiver,
-                        packet_sender,
                         recycler,
                         exit,
-                    )
-                })
-                .unwrap(),
-            Builder::new()
-                .name("solTvuFetchQuic".to_string())
-                .spawn(move || {
-                    Self::modify_packets(
-                        packet_receiver,
-                        sender,
-                        &bank_forks,
-                        shred_version,
-                        "shred_fetch_quic",
-                        PacketFlags::empty(),
-                        None, // repair_context
-                        turbine_disabled,
                     )
                 })
                 .unwrap(),
@@ -304,9 +163,8 @@ impl ShredFetchStage {
     }
 }
 
-fn receive_quic_datagrams(
+fn varun_receive_quic_datagrams(
     turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,
-    sender: Sender<PacketBatch>,
     recycler: PacketBatchRecycler,
     exit: Arc<AtomicBool>,
 ) {
@@ -318,7 +176,7 @@ fn receive_quic_datagrams(
             Err(RecvTimeoutError::Disconnected) => return,
         };
         let mut packet_batch =
-            PacketBatch::new_with_recycler(&recycler, PACKETS_PER_BATCH, "receive_quic_datagrams");
+            PacketBatch::new_with_recycler(&recycler, PACKETS_PER_BATCH, "varun_receive_quic_datagrams");
         unsafe {
             packet_batch.set_len(PACKETS_PER_BATCH);
         };
@@ -342,9 +200,9 @@ fn receive_quic_datagrams(
             .count();
         if size > 0 {
             packet_batch.truncate(size);
-            if sender.send(packet_batch).is_err() {
-                return;
-            }
+            // if sender.send(packet_batch).is_err() {
+            //     return;
+            // }
         }
     }
 }
@@ -363,7 +221,7 @@ pub(crate) fn receive_repair_quic_packets(
             Err(RecvTimeoutError::Disconnected) => return,
         };
         let mut packet_batch =
-            PacketBatch::new_with_recycler(&recycler, PACKETS_PER_BATCH, "receive_quic_datagrams");
+            PacketBatch::new_with_recycler(&recycler, PACKETS_PER_BATCH, "varun_receive_quic_datagrams");
         unsafe {
             packet_batch.set_len(PACKETS_PER_BATCH);
         };
