@@ -199,7 +199,7 @@ enum ShredVariant {
 
 /// A common header that is present in data and code shred headers
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct ShredCommonHeader {
+pub struct ShredCommonHeader {
     signature: Signature,
     shred_variant: ShredVariant,
     slot: Slot,
@@ -210,7 +210,7 @@ struct ShredCommonHeader {
 
 /// The data shred header has parent offset and flags
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct DataShredHeader {
+pub struct DataShredHeader {
     parent_offset: u16,
     flags: ShredFlags,
     size: u16, // common shred header + data shred header + data
@@ -218,10 +218,16 @@ struct DataShredHeader {
 
 /// The coding shred header has FEC information
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct CodingShredHeader {
+pub struct CodingShredHeader {
     num_data_shreds: u16,
     num_coding_shreds: u16,
     position: u16, // [0..num_coding_shreds)
+}
+
+#[derive(Debug)]
+pub struct SpecificHeader {
+    coding_header: Option<CodingShredHeader>,
+    data_header: Option<DataShredHeader>
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -320,9 +326,10 @@ macro_rules! dispatch {
 }
 
 use dispatch;
+use crate::shred;
 
 impl Shred {
-    dispatch!(fn common_header(&self) -> &ShredCommonHeader);
+    dispatch!(pub fn common_header(&self) -> &ShredCommonHeader);
     dispatch!(fn set_signature(&mut self, signature: Signature));
     dispatch!(fn signed_data(&self) -> Result<SignedData, Error>);
 
@@ -448,6 +455,20 @@ impl Shred {
         match self {
             Self::ShredCode(shred) => shred.payload(),
             Self::ShredData(shred) => shred.bytes_to_store(),
+        }
+    }
+
+    pub fn extract_specific_header(&self) -> SpecificHeader {
+        match self {
+            Shred::ShredCode(ShredCode) => {
+                let code_shred = Some(ShredCode.coding_header().clone());
+                SpecificHeader {coding_header: code_shred, data_header: None }
+
+            },
+            Shred::ShredData(ShredData) => {
+                let data_shred = Some(ShredData.data_header().clone());
+                SpecificHeader {coding_header: None, data_header: data_shred }
+            }
         }
     }
 

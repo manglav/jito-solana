@@ -28,11 +28,14 @@ use {
         time::{Duration, Instant},
     },
 };
+use solana_entry::entry::Entry;
 use solana_ledger::{blockstore, shred};
-use solana_ledger::blockstore::MAX_DATA_SHREDS_PER_SLOT;
-use solana_ledger::shred::{ReedSolomonCache, Shredder};
+use solana_ledger::blockstore::{BlockstoreError, MAX_DATA_SHREDS_PER_SLOT};
+use solana_ledger::shred::{ReedSolomonCache, shred_code, Shredder};
 // use solana_ledger::shred::{layout, shred_code, ShredType};
 use solana_sdk::packet::Packet;
+use solana_sdk::transaction::VersionedTransaction;
+use crate::banking_stage::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use crate::repair::serve_repair::ShredRepairType::Shred;
 
 const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
@@ -54,7 +57,7 @@ impl VarunShredFetchStage {
         let mut stats = ShredFetchStats::default();
 
         for mut packet_batch in recvr {
-            println!("packetreceived1");
+            // println!("packetreceived1");
             if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
                 last_updated = Instant::now();
                 stats.shred_count += packet_batch.len();
@@ -71,8 +74,47 @@ impl VarunShredFetchStage {
                     .filter_map(|s| shred::Shred::new_from_serialized_shred(s).ok())
                     .collect();
 
-                // This works in the debugger
-                // shreds[0].ptr.pointer.pointer.ShredData[0]
+                println!("=============Batch Started====={}=====", shreds.len());
+                for (i, shred) in shreds.iter().enumerate() {
+
+                    println!("index:{}", i);
+                    // ShredCode(ShredCode)()
+                    println!("{:#?}", &shred.common_header() );
+                    println!("{:#?}", &shred.extract_specific_header() );
+                }
+
+                let deshred_payload_base = Shredder::deshred(&shreds).map_err(|e| {
+                    BlockstoreError::InvalidShredData(Box::new(bincode::ErrorKind::Custom(format!(
+                        "Could not reconstruct data block from constituent shreds, error: {e:?}"
+                    ))))
+                });
+
+                if deshred_payload_base.is_ok() {
+                    let deshred_payload = deshred_payload_base.unwrap();
+                    debug!("{:?} shreds in last FEC set", shreds.len(),);
+                    bincode::deserialize::<Vec<Entry>>(&deshred_payload).map_err(|e| {
+                        BlockstoreError::InvalidShredData(Box::new(bincode::ErrorKind::Custom(format!(
+                            "could not reconstruct entries: {e:?}"
+                        ))))
+                    });
+                }
+
+                ///////////////
+
+                let mypacketbatch = packet_batch.clone();
+                let desr_packets: Vec<_> = mypacketbatch.iter()
+                    .filter_map(|p| {
+                        let new_pack = p.clone();
+                        let despacket = ImmutableDeserializedPacket::new(new_pack);
+                        return despacket.ok()
+                    })
+                    .collect();
+
+               if desr_packets.len() > 0 {
+                   println!("found desr packet")
+               };
+                println!("packets");
+                println!("{:#?}", desr_packets);
 
                 // TODO - Might need this code to recover
                 // let reed_solomon_cache = ReedSolomonCache::default();
@@ -92,9 +134,9 @@ impl VarunShredFetchStage {
 
 
                 for packet in packet_batch.iter_mut().filter(|p| !p.meta().discard()) {
-                    println!("packetreceived2");
+                    // println!("packetreceived2");
                     if varun_should_discard_shred(packet) {
-                        println!("discarding packet")
+                        // println!("discarding packet")
                     }
 
                     // if turbine_disabled
@@ -213,7 +255,7 @@ fn varun_should_discard_shred(
             return true;
         }
         Some(shred) => {
-            println!("inpacket");
+            // println!("inpacket");
             let x = shred;
             x
         },

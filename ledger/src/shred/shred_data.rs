@@ -17,7 +17,7 @@ pub enum ShredData {
 }
 
 impl ShredData {
-    dispatch!(fn data_header(&self) -> &DataShredHeader);
+    dispatch!(pub fn data_header(&self) -> &DataShredHeader);
 
     dispatch!(pub(super) fn common_header(&self) -> &ShredCommonHeader);
     dispatch!(pub(super) fn data(&self) -> Result<&[u8], Error>);
