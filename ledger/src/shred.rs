@@ -50,7 +50,10 @@
 //! payload can fit into one coding shred / packet.
 
 use std::any::Any;
+use base64::{engine::general_purpose, Engine as _};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fmt;
+use std::os::macos::raw::time_t;
 #[cfg(test)]
 pub(crate) use self::shred_code::MAX_CODE_SHREDS_PER_SLOT;
 use {
@@ -307,10 +310,14 @@ pub struct SpecificHeader {
 }
 
 #[derive(Debug)]
+#[derive(serde::Serialize)]
 pub struct ShredDump {
+    batch_start_time: u128,
+    shred_parse_time: u128,
     local_packet_batch_received_index: usize,
     index_in_local_batch: usize,
     // common header attributes + helpers
+    sc_payload: String,
     sc_signature: String,
     sc_variant_type: String,
     sc_slot: u64,
@@ -336,8 +343,7 @@ pub struct ShredDump {
     // shred_data: [u8],
 }
 
-pub fn dump_shred(shred: &Shred, local_batch_index: usize, packet_index: usize) -> ShredDump {
-    println!("hello");
+pub fn build_dumped_shred(shred: &Shred, local_batch_index: usize, packet_index: usize, batch_start_time: u128) -> ShredDump {
 
     let cods_num_data_shreds = match shred.num_data_shreds() {
         Ok(val) => {
@@ -383,31 +389,7 @@ pub fn dump_shred(shred: &Shred, local_batch_index: usize, packet_index: usize) 
         None
     };
 
-    // let sc_global_code_shred_index_over_slot = match shred.index() {
-    //     Ok(val) => {
-    //         val
-    //     },
-    //     Err(err) => {
-    //         None:u32
-    //     }
-    // };
-    //
-    // let sc_data_shred_index_over_slot = match shred.index() {
-    //     Ok(val) => {
-    //         val
-    //     },
-    //     Err(err) => {
-    //         None:u32
-    //     }
-    // };
-
-
-    // if let Ok(sk) = keypair_from_seed(&seed_bytes) {
-    //     // ... use sk ...
-    // } else {
-    //     // ... sk is not available, may be should
-    //     // we warn the user, ask for an alternative ...
-    // }
+    let payload_string = general_purpose::STANDARD.encode(&shred.payload());
 
 
     // ===== FOUND IN CODE 100% ACCURATE
@@ -433,9 +415,12 @@ pub fn dump_shred(shred: &Shred, local_batch_index: usize, packet_index: usize) 
 
 
     return ShredDump{
+        batch_start_time,
+        shred_parse_time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_micros(),
         local_packet_batch_received_index: local_batch_index,
         index_in_local_batch: packet_index,
 
+        sc_payload: payload_string,
         sc_signature: shred.signature().to_string(),
         sc_variant_type: shred.common_header().shred_variant.to_string(),//shred.get_shred_variant(),
         sc_is_data_type: shred.is_data(),

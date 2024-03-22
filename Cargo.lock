@@ -6076,6 +6076,7 @@ dependencies = [
  "bytes",
  "chrono",
  "crossbeam-channel",
+ "csv",
  "dashmap 4.0.2",
  "eager",
  "etcd-client",
@@ -6499,6 +6500,7 @@ name = "solana-ledger"
 version = "1.17.25"
 dependencies = [
  "assert_matches",
+ "base64 0.21.4",
  "bincode",
  "bitflags 2.3.3",
  "bs58 0.4.0",

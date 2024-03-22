@@ -1,5 +1,9 @@
 //! The `varun_shred_fetch_stage` pulls shreds from UDP sockets and sends it to a channel.
 
+use std::error::Error;
+use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
+use csv::Writer;
 use {
     crate::repair::serve_repair::ServeRepair,
     bytes::Bytes,
@@ -57,14 +61,24 @@ impl VarunShredFetchStage {
         const STATS_SUBMIT_CADENCE: Duration = Duration::from_secs(1);
         let mut last_updated = Instant::now();
         let mut stats = ShredFetchStats::default();
-        let packet_batch_index = 0;
+        let mut packet_batch_index = 0;
+
+
+        let mut wtr = Writer::from_path("/Users/vmangla/solana_stufff/shreds.csv").unwrap();
+        // wtr.write_record(&["a", "b", "c"]);
+        // wtr.write_record(&["x", "y", "z"]);
+        wtr.flush();
+        // Ok(());
 
         for mut packet_batch in recvr {
-            packet_batch_index + 1;
+            packet_batch_index = packet_batch_index + 1;
             error!("packetreceived1");
             // if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
             if true {
                 last_updated = Instant::now();
+                let batch_start_time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_micros();
+
+
                 stats.shred_count += packet_batch.len();
                 error!("received backet batch of length: {}", packet_batch.len());
 
@@ -82,12 +96,19 @@ impl VarunShredFetchStage {
 
                 error!("=============Batch Started====={}=====", shreds.len());
                 for (iter_index, shred) in shreds.iter().enumerate() {
-
+                    let dumped_shred = shred::build_dumped_shred(&shred, packet_batch_index, iter_index, batch_start_time);
                     // error!("index:{}", iter_index);
                     // ShredCode(ShredCode)()
                     // error!("{:#?}", &shred.common_header() );
                     // error!("{:#?}", &shred.extract_specific_header() );
-                    error!("{:#?}", shred::dump_shred(&shred, packet_batch_index, iter_index));
+                    // error!("{:#?}", dumped_shred );
+                    wtr.serialize(dumped_shred);
+                    if packet_batch_index > 2000 {
+                        wtr.flush();
+                        println!("EXITING");
+                        process::exit(25);
+                    }
+
                     // error!("reference_tick {:#?}", &shred.pub_reference_tick() );
 
                     // NEED TO SERIALIZE THIS SHRED, THEN ADD REFERENCE TICK TO PRINTOUT
@@ -125,8 +146,8 @@ impl VarunShredFetchStage {
                if desr_packets.len() > 0 {
                    println!("found desr packet")
                };
-                println!("packets");
-                println!("{:#?}", desr_packets);
+                // println!("packets");
+                // println!("{:#?}", desr_packets);
 
 
                 // TODO - Might need this code to recover
