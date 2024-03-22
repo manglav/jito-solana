@@ -316,7 +316,7 @@ pub struct ShredDump {
     local_packet_batch_received_index: usize,
     index_in_local_batch: usize,
     // common header attributes + helpers
-    sc_payload: String,
+    sc_data_in_shred: Option<String>,
     sc_signature: String,
     sc_variant_type: String,
     sc_slot: u64,
@@ -388,7 +388,17 @@ pub fn build_dumped_shred(shred: &Shred, local_batch_index: usize, packet_index:
         None
     };
 
-    let payload_string = general_purpose::STANDARD.encode(&shred.payload());
+    let sc_data_in_shred = if shred.data().is_ok() {
+        Some(
+            general_purpose::STANDARD.encode(
+                shred.data().unwrap()
+            )
+        )
+    } else {
+        None
+    };
+
+    // let sc_data_in_shred = general_purpose::STANDARD.encode(.unwrap());
 
 
     // ===== FOUND IN CODE 100% ACCURATE
@@ -418,8 +428,7 @@ pub fn build_dumped_shred(shred: &Shred, local_batch_index: usize, packet_index:
         shred_parse_time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_micros(),
         local_packet_batch_received_index: local_batch_index,
         index_in_local_batch: packet_index,
-
-        sc_payload: payload_string,
+        sc_data_in_shred,
         sc_signature: shred.signature().to_string(),
         sc_variant_type: shred.common_header().shred_variant.to_string(),//shred.get_shred_variant(),
         sc_is_data_type: shred.is_data(),

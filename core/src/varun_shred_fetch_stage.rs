@@ -122,6 +122,7 @@ impl VarunShredFetchStage {
                     ))))
                 });
 
+
                 if deshred_payload_base.is_ok() {
                     let deshred_payload = deshred_payload_base.unwrap();
                     debug!("{:?} shreds in last FEC set", shreds.len(),);
