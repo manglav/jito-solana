@@ -1865,6 +1865,7 @@ impl Blockstore {
         self.put_meta_bytes(slot, &bincode::serialize(meta)?)
     }
 
+    // THIS IS INTERESTING
     /// Find missing shred indices for a given `slot` within the range
     /// [`start_index`, `end_index`]. Missing shreds will only be reported as
     /// missing if they should be present by the time this function is called,
@@ -1926,6 +1927,7 @@ impl Blockstore {
             let upper_index = cmp::min(current_index, end_index);
             // the tick that will be used to figure out the timeout for this hole
             let data = db_iterator.value().expect("couldn't read value");
+            // THIS IS INTERESTING
             let reference_tick = u64::from(shred::layout::get_reference_tick(data).unwrap());
             if ticks_since_first_insert < reference_tick + defer_threshold_ticks {
                 // The higher index holes have not timed out yet

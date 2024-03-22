@@ -49,6 +49,8 @@
 //! So, given a) - c), we must restrict data shred's payload length such that the entire coding
 //! payload can fit into one coding shred / packet.
 
+use std::any::Any;
+use std::fmt;
 #[cfg(test)]
 pub(crate) use self::shred_code::MAX_CODE_SHREDS_PER_SLOT;
 use {
@@ -117,10 +119,76 @@ pub const LEGACY_SHRED_DATA_CAPACITY: usize = legacy::ShredData::CAPACITY;
 
 // LAST_SHRED_IN_SLOT also implies DATA_COMPLETE_SHRED.
 // So it cannot be LAST_SHRED_IN_SLOT if not also DATA_COMPLETE_SHRED.
+
+// DATA_COMPLETE_SHRED == batch complete, 64
+// LAST_SHRED_IN_SLOT == The last data shred of the block has the "block complete" bit set.
+// https://github.com/solana-foundation/specs/blob/main/p2p/shred.md#shredding
+// The last data shred of each batch has the "batch complete" bit set. This field can be extracted using data flags bit 0x40.
+//
+// The last data shred of the block has the "block complete" bit set. This field can be extracted using data flags bit 0x80. Since a block contains an integral number of entry batches, the last data shred of the block must also be the last data shred of a batch.
+
+// The "batch tick number" of all shreds in a batch is set to the number of PoH ticks that have passed since the beginning of the slot for the first entry in the batch.
+// Since Solana has 64 ticks per slot, this field cannot overflow.
+
+// THIS IMPLIES THAT ONE SLOT => MAX 64 Serialized Batches
+// DATA STRUCTURE =
+// Many Data Shred => Serialized Entry Batch ( one byte array)
+//The serialization of a batch is the concatenation of all serialized entries
+
+// Serialize(batch) = Entries.Inject(|entry, bytes| bytes += serialize(entry))
+// Final_bytes = prefix(entry_count, serialized_batch)
+
+// Block ==  batches of Entries
+// serialize batch => shreds
+
+// 1 packet ==> Shred
+// Many Shreds (is there a max) ==> 1 Serialized Entry Batch
+// Many Serialized Entry Batches (max 64) == Slot
+
+// so when you receive a packet, you are receiving a window of bytes of a serialized entry batch. So theoretically,if the serialized is linear (which it is)
+
+// Entry ------ Entry ------ Entry -------
+// E1TX1 --- E1TX2 --- | E2TX1 --- E2TX2 ---
+//
+// Your first byte is either at 0 of an entry, or 0-1
+// Your last byte is either at end of an entry, or 5-6
+// for example
+//
+// We're around 3000 transactions / s, which is 2.5 slots == 1200 tx / slot. 1200 /64 max batches , 20 TXs / batch.
+// 20 TXs * average bytes / TX
+// then divide by bytes per shred = # of shreds / batch
+// 1 kilobyte per shard
+// https://solana.stackexchange.com/questions/3363/what-is-the-maximum-entry-size
+
+// https://www.helius.dev/blog/turbine-block-propagation-on-solana
+// 50k TPS generating 6400 shreds per second
+// == 8 Transactions / shred
+// == each batch is 2.5 shreds minimum (there doesn't have to be 64 batches per slot), and max 64
+// shredstream apparently transmits each packet batch
+
+// https://docs.solanalabs.com/consensus/turbine-block-propagation#calculating-the-required-fec-rate
+//
+// How many transactions make up an Entry? ( can find this via bigtable) these are transactions that can be executed in parallel
+
+// CHECK PERF::PACKET!!!! max 64 packets per batch
+// Data shreds are grouped together to form forward error correction (FEC) sets. The block producer may choose
+// , the number of contiguous data shreds to include in the FEC set. However, an FEC set must have at least 1 and no more than 67 data shreds, and N = 32
+// is recommended.
+
+// Shreds are uniformly split into erasure batches with a "target" number of
+// data shreds per each batch as below. The actual number of data shreds in
+// each erasure batch depends on the number of shreds obtained from serializing
+// a &[Entry].
+// pub const DATA_SHREDS_PER_FEC_BLOCK: usize = 32;
+
 bitflags! {
+
+
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
     pub struct ShredFlags:u8 {
         const SHRED_TICK_REFERENCE_MASK = 0b0011_1111;
+
+
         const DATA_COMPLETE_SHRED       = 0b0100_0000;
         const LAST_SHRED_IN_SLOT        = 0b1100_0000;
     }
@@ -197,6 +265,14 @@ enum ShredVariant {
     MerkleData(/*proof_size:*/ u8), // 0b1000_????
 }
 
+impl fmt::Display for ShredVariant {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+        // or, alternatively:
+        // fmt::Debug::fmt(self, f)
+    }
+}
+
 /// A common header that is present in data and code shred headers
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ShredCommonHeader {
@@ -228,6 +304,158 @@ pub struct CodingShredHeader {
 pub struct SpecificHeader {
     coding_header: Option<CodingShredHeader>,
     data_header: Option<DataShredHeader>
+}
+
+#[derive(Debug)]
+pub struct ShredDump {
+    local_packet_batch_received_index: usize,
+    index_in_local_batch: usize,
+    // common header attributes + helpers
+    sc_signature: String,
+    sc_variant_type: String,
+    sc_slot: u64,
+    sc_is_data_type: bool,
+    // could point to (data OR coding) for this one
+    sc_global_data_shred_index_over_slot: Option<u32>,
+    sc_global_code_shred_index_over_slot: Option<u32>,
+    sc_shred_version: u16,
+    // (is the pointer to the first CODE shred or DATA shred in the same FEC set?
+    sc_fec_set_index: u32,
+
+    // coding shred attributes
+    cods_num_data_shreds: Option<u16>,
+    cods_num_coding_shreds: Option<u16>,
+    cods_position: Option<u16>,
+
+    // data shred v2
+    dats_parent_offset: Option<u16>,
+    dats_data_flags_block_complete: bool,
+    dats_data_flags_batch_complete: bool,
+    dats_data_flags_batch_tick: u8,
+    dats_size: Option<u16>,
+    // shred_data: [u8],
+}
+
+pub fn dump_shred(shred: &Shred, local_batch_index: usize, packet_index: usize) -> ShredDump {
+    println!("hello");
+
+    let cods_num_data_shreds = match shred.num_data_shreds() {
+        Ok(val) => {
+            Some(val)
+        },
+        Err(err) => {
+            None
+        }
+    };
+
+    let cods_num_coding_shreds = match shred.num_coding_shreds() {
+        Ok(val) => {
+            Some(val)
+        },
+        Err(err) => {
+            None
+        }
+    };
+
+    let (sc_global_data_shred_index_over_slot,sc_global_code_shred_index_over_slot )= if shred.is_data() {
+        (Some(shred.index()), None)
+    } else {
+        (None, Some(shred.index()))
+    };
+
+    let sh = shred.extract_specific_header();
+
+    let cods_position = if sh.coding_header.is_some() {
+        Some(sh.coding_header.unwrap().position)
+    } else {
+        None
+    };
+
+    let dats_parent_offset = if sh.data_header.is_some() {
+        Some(sh.data_header.unwrap().parent_offset)
+    } else {
+        None
+    };
+
+    let dats_size = if sh.data_header.is_some() {
+        Some(sh.data_header.unwrap().size)
+    } else {
+        None
+    };
+
+    // let sc_global_code_shred_index_over_slot = match shred.index() {
+    //     Ok(val) => {
+    //         val
+    //     },
+    //     Err(err) => {
+    //         None:u32
+    //     }
+    // };
+    //
+    // let sc_data_shred_index_over_slot = match shred.index() {
+    //     Ok(val) => {
+    //         val
+    //     },
+    //     Err(err) => {
+    //         None:u32
+    //     }
+    // };
+
+
+    // if let Ok(sk) = keypair_from_seed(&seed_bytes) {
+    //     // ... use sk ...
+    // } else {
+    //     // ... sk is not available, may be should
+    //     // we warn the user, ask for an alternative ...
+    // }
+
+
+    // ===== FOUND IN CODE 100% ACCURATE
+    // IMPORTANT
+// An upper bound on maximum number of data shreds we can handle in a slot
+// 32K shreds would allow ~320K peak TPS
+// (32K shreds per slot * 4 TX per shred * 2.5 slots per sec)
+//     pub const MAX_DATA_SHREDS_PER_SLOT: usize = 32_768;
+//     MAX_CODE_SHREDS_PER_SLOT == max data shreds
+
+    // At 160 ticks/s, 64 ticks per slot implies that leader rotation and voting will happen
+// every 400 ms. A fast voting cadence ensures faster finality and convergence
+//     pub const DEFAULT_TICKS_PER_SLOT: u64 = 64;
+    ///////
+// This means 32768/64 = 512 Upper bound of shreds/tick
+
+
+    // /// The number of milliseconds per tick (6).
+    // pub const MS_PER_TICK: u64 = 1000 / DEFAULT_TICKS_PER_SECOND; ~ 6.6ms / tick
+    // pub const DEFAULT_TICKS_PER_SECOND: u64 = 160;
+
+    // ONE SLOT => MAX 64 Serialized Batches
+
+
+    return ShredDump{
+        local_packet_batch_received_index: local_batch_index,
+        index_in_local_batch: packet_index,
+
+        sc_signature: shred.signature().to_string(),
+        sc_variant_type: shred.common_header().shred_variant.to_string(),//shred.get_shred_variant(),
+        sc_is_data_type: shred.is_data(),
+        sc_slot: shred.slot(),
+        sc_global_data_shred_index_over_slot,
+        sc_global_code_shred_index_over_slot,
+        sc_shred_version: shred.version(),
+        sc_fec_set_index: shred.fec_set_index(),
+        // shred_data: shred.data(), // change this for code/data
+
+        // coding shred data
+        cods_num_data_shreds,
+        cods_num_coding_shreds,//shred.num_data_shreds().unwrap(),
+        cods_position,
+        dats_parent_offset,
+        dats_data_flags_block_complete: shred.last_in_slot(),
+        dats_data_flags_batch_complete: shred.data_complete(),
+        dats_data_flags_batch_tick: shred.reference_tick(),
+        dats_size,
+    };
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -326,6 +554,7 @@ macro_rules! dispatch {
 }
 
 use dispatch;
+use solana_sdk::clock::DEFAULT_TICKS_PER_SECOND;
 use crate::shred;
 
 impl Shred {
@@ -538,6 +767,13 @@ impl Shred {
     }
 
     pub(crate) fn reference_tick(&self) -> u8 {
+        match self {
+            Self::ShredCode(_) => ShredFlags::SHRED_TICK_REFERENCE_MASK.bits(),
+            Self::ShredData(shred) => shred.reference_tick(),
+        }
+    }
+
+    pub fn pub_reference_tick(&self) -> u8 {
         match self {
             Self::ShredCode(_) => ShredFlags::SHRED_TICK_REFERENCE_MASK.bits(),
             Self::ShredData(shred) => shred.reference_tick(),

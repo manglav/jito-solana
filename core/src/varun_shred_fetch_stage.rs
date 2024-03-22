@@ -10,6 +10,7 @@ use {
     solana_ledger::shred::{should_discard_shred, ShredFetchStats},
     solana_perf::packet::{PacketBatch, PacketBatchRecycler, PacketFlags, PACKETS_PER_BATCH},
     solana_runtime::bank_forks::BankForks,
+    // solana::logger,
     solana_sdk::{
         clock::{Slot, DEFAULT_MS_PER_SLOT},
         epoch_schedule::EpochSchedule,
@@ -52,15 +53,20 @@ impl VarunShredFetchStage {
         name: &'static str,
         flags: PacketFlags,
     ) {
+        // solana_ledger::setup();
         const STATS_SUBMIT_CADENCE: Duration = Duration::from_secs(1);
         let mut last_updated = Instant::now();
         let mut stats = ShredFetchStats::default();
+        let packet_batch_index = 0;
 
         for mut packet_batch in recvr {
-            // println!("packetreceived1");
-            if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
+            packet_batch_index + 1;
+            error!("packetreceived1");
+            // if last_updated.elapsed().as_millis() as u64 > DEFAULT_MS_PER_SLOT {
+            if true {
                 last_updated = Instant::now();
                 stats.shred_count += packet_batch.len();
+                error!("received backet batch of length: {}", packet_batch.len());
 
                 // Limit shreds to 2 epochs away.
                 // let should_drop_legacy_shreds =
@@ -74,13 +80,19 @@ impl VarunShredFetchStage {
                     .filter_map(|s| shred::Shred::new_from_serialized_shred(s).ok())
                     .collect();
 
-                println!("=============Batch Started====={}=====", shreds.len());
-                for (i, shred) in shreds.iter().enumerate() {
+                error!("=============Batch Started====={}=====", shreds.len());
+                for (iter_index, shred) in shreds.iter().enumerate() {
 
-                    println!("index:{}", i);
+                    // error!("index:{}", iter_index);
                     // ShredCode(ShredCode)()
-                    println!("{:#?}", &shred.common_header() );
-                    println!("{:#?}", &shred.extract_specific_header() );
+                    // error!("{:#?}", &shred.common_header() );
+                    // error!("{:#?}", &shred.extract_specific_header() );
+                    error!("{:#?}", shred::dump_shred(&shred, packet_batch_index, iter_index));
+                    // error!("reference_tick {:#?}", &shred.pub_reference_tick() );
+
+                    // NEED TO SERIALIZE THIS SHRED, THEN ADD REFERENCE TICK TO PRINTOUT
+                    // let reference_tick = u64::from(shred::layout::get_reference_tick(shred).unwrap());
+
                 }
 
                 let deshred_payload_base = Shredder::deshred(&shreds).map_err(|e| {
@@ -115,6 +127,7 @@ impl VarunShredFetchStage {
                };
                 println!("packets");
                 println!("{:#?}", desr_packets);
+
 
                 // TODO - Might need this code to recover
                 // let reed_solomon_cache = ReedSolomonCache::default();

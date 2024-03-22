@@ -175,6 +175,7 @@ impl ShredData {
         get_merkle_node(&self.payload, SIZE_OF_SIGNATURE..proof_offset)
     }
 
+    // THIS IS INTERESTING
     fn from_recovered_shard(signature: &Signature, mut shard: Vec<u8>) -> Result<Self, Error> {
         let shard_size = shard.len();
         if shard_size + SIZE_OF_SIGNATURE > Self::SIZE_OF_PAYLOAD {
