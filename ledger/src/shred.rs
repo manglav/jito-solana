@@ -53,7 +53,6 @@ use std::any::Any;
 use base64::{engine::general_purpose, Engine as _};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fmt;
-use std::os::macos::raw::time_t;
 #[cfg(test)]
 pub(crate) use self::shred_code::MAX_CODE_SHREDS_PER_SLOT;
 use {
