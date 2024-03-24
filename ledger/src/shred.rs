@@ -1118,6 +1118,7 @@ pub(crate) fn make_merkle_shreds_from_entries(
     stats: &mut ProcessShredsStats,
 ) -> Result<Vec<Shred>, Error> {
     let now = Instant::now();
+    // THIS IS IMPORTANT
     let entries = bincode::serialize(entries)?;
     stats.serialize_elapsed += now.elapsed().as_micros() as u64;
     let shreds = merkle::make_shreds_from_data(

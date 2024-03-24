@@ -791,6 +791,7 @@ fn get_proof_size(num_shreds: usize) -> u8 {
     u8::try_from(proof_size).unwrap()
 }
 
+// THIS IS IMPORTANT
 #[allow(clippy::too_many_arguments)]
 pub(super) fn make_shreds_from_data(
     thread_pool: &ThreadPool,
@@ -854,10 +855,24 @@ pub(super) fn make_shreds_from_data(
     // Split the data into erasure batches and initialize
     // data shreds from chunks of each batch.
     let mut shreds = Vec::<ShredData>::new();
+    // Initialize shreds var to hold all shreds
+
+    // This while loop splits the DATA into many shards.But they all have the same
+    // data header? And the common header changes, but not sure how during the loop.
+
+
+    // Then, while the bytes that need to be placed into a shred exist
+    // and there's enough data left for a chunk
     while data.len() >= 2 * chunk_size || data.len() == chunk_size {
+        // split off a chunk
         let (chunk, rest) = data.split_at(chunk_size);
+        // set the header but I don't know why
         common_header.fec_set_index = common_header.index;
+        // this splits the Chunk data, into further chunks of data_buffer_size
         for shred in chunk.chunks(data_buffer_size) {
+            // sub_chunk is then turned into a shard
+            // which means a chunk is a SHARD_BATCH
+            // which means  many shard batches make the DATA
             let shred = new_shred_data(common_header, data_header, shred);
             shreds.push(shred);
             common_header.index += 1;

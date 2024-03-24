@@ -115,6 +115,7 @@ impl Shredder {
         (data_shreds, coding_shreds)
     }
 
+    // THIS IS IMPORTANT (non merkle conversion)
     fn entries_to_data_shreds(
         &self,
         keypair: &Keypair,
