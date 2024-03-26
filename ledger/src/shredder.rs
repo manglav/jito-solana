@@ -607,6 +607,103 @@ mod tests {
         run_test_data_shredder(0x1234_5678_9abc_def0);
     }
 
+//
+// let data: Vec<_> = shreds.iter().map(Shred::data).collect::<Result<_, _>>()?;
+// let data: Vec<_> = data.into_iter().flatten().copied().collect();
+//
+//         let deshred_payload = Shredder::deshred(&data_shreds).map_err(|e| {
+// BlockstoreError::InvalidShredData(Box::new(bincode::ErrorKind::Custom(format!(
+// "Could not reconstruct data block from constituent shreds, error: {e:?}"
+// ))))
+// })?;
+//
+//     debug!("{:?} shreds in last FEC set", data_shreds.len(),);
+//     bincode::deserialize::<Vec<Entry>>(&deshred_payload).map_err(|e| {
+// BlockstoreError::InvalidShredData(Box::new(bincode::ErrorKind::Custom(format!(
+// "could not reconstruct entries: {e:?}"
+// ))))
+// })
+    #[test]
+    fn varun_test_deserialize_shred_payload() {
+        let keypair = Arc::new(Keypair::new());
+        let slot = 1;
+        let parent_slot = 0;
+        let shredder = Shredder::new(slot, parent_slot, 0, 0).unwrap();
+        let number_of_fake_entries = 40;
+
+        // construct entries with fake transactions
+        let entries: Vec<_> = (0..number_of_fake_entries)
+            .map(|_| {
+                let keypair0 = Keypair::new();
+                let keypair1 = Keypair::new();
+                let tx0 =
+                    system_transaction::transfer(&keypair0, &keypair1.pubkey(), 1, Hash::default());
+                Entry::new(&Hash::default(), 1, vec![tx0])
+            })
+            .collect();
+
+        // Shred entries to shreds
+        let (data_shreds, _) = shredder.entries_to_shreds(
+            &keypair,
+            &entries,
+            true, // is_last_in_slot
+            0,    // next_shred_index
+            0,    // next_code_index
+            true, // merkle_variant
+            &ReedSolomonCache::default(),
+            &mut ProcessShredsStats::default(),
+        );
+        // let deserialized_shred =
+        //     Shred::new_from_serialized_shred(data_shreds.last().unwrap().payload().clone())
+        //         .unwrap();
+
+
+        // Deshreds ALL of the shreds.
+        let deshred_payload = Shredder::deshred(&data_shreds).unwrap();
+        let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&deshred_payload);
+
+        // checks if all entries in entry batch, have been turned to shreds, and turned back to entries
+        if let Ok(deserialized_entries) = deserialized_entries {
+            println!("Checking entries");
+            assert_eq!(entries, deserialized_entries);
+        } else {
+            println!("uhoh");
+            assert_eq!(1, 2);
+        }
+
+        // Now try to take one Shred and extract one entry
+        println!("length of entries {}", entries.len());
+        println!("length of shreds {}", data_shreds.len());
+
+        let try_smaller_number_of_shreds = 1;
+        // &[Shreds] desired input
+
+        let payload = extract_data_payload_from_shards(data_shreds)
+            .expect("couldn't zip bytes from shreds");
+
+        let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&payload).
+            expect("deserialized_error");
+        // assert(deserialized_entries));
+        assert_eq!(deserialized_entries.len(), number_of_fake_entries);
+        println!("{:#?}", deserialized_entries );
+
+}
+
+    fn extract_data_payload_from_shards(shreds:Vec<Shred>) -> Result<Vec<u8>, Error>  {
+        let arr_shreds = shreds.as_slice();
+        // shreds: &[Shred]
+        let data: Vec<_> = arr_shreds.iter().map(Shred::data).collect::<Result<_, _>>()?;
+
+        let data: Vec<_> = data.into_iter().flatten().copied().collect();
+        if data.is_empty() {
+            let data_buffer_size = ShredData::capacity(/*merkle_proof_size:*/ None).unwrap();
+            Ok(vec![0u8; data_buffer_size])
+        } else {
+            Ok(data)
+        }
+    }
+
+
     #[test]
     fn test_deserialize_shred_payload() {
         let keypair = Arc::new(Keypair::new());
