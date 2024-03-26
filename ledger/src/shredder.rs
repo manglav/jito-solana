@@ -773,8 +773,9 @@ mod tests {
         let keypair = Arc::new(Keypair::new());
         let slot = 1;
         let parent_slot = 0;
-        let number_of_fake_entries = 10;
+        let number_of_fake_entries = 10; // with two entries, can fit into one shred
 
+        // to generate bytes, bincode::serialize(&[Entry])
         let (entries, shreds) = generate_entry_batch_and_shreds(
             keypair, slot, parent_slot, number_of_fake_entries);
 
@@ -782,7 +783,9 @@ mod tests {
         println!("length of entries {}", entries.len());
         println!("length of shreds {}", shreds.len());
 
-        let try_smaller_number_of_shreds = 5;
+        // Key variable to change for testing.
+        // shreds.len() implies the entire batch, so should pass.
+        let try_smaller_number_of_shreds = shreds.len();
         // &[Shreds] desired input
 
         let payload = extract_data_payload_from_shards
@@ -794,6 +797,16 @@ mod tests {
         // assert(deserialized_entries));
         assert_eq!((deserialized_entries.len() as i32), number_of_fake_entries);
         println!("{:#?}", deserialized_entries );
+
+
+        let single_entry_payload = bincode::serialize(&entries[0]).unwrap();
+        println!("single entry serializes into byte array {:?}", single_entry_payload);
+        println!("all payload entries serializes into byte array {:?}", payload);
+
+        // EXTRA DEBUG: Now try to take one Shred and extract one entry
+        println!("length of entries {}", &entries.len());
+        println!("length of shreds {}", &shreds.len());
+
     }
 
     fn extract_data_payload_from_shards(shreds:Vec<Shred>) -> Result<Vec<u8>, Error>  {
