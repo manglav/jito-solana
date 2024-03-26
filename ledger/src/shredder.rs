@@ -675,19 +675,126 @@ mod tests {
         println!("length of entries {}", entries.len());
         println!("length of shreds {}", data_shreds.len());
 
-        let try_smaller_number_of_shreds = 1;
+        let try_smaller_number_of_shreds = 5;
         // &[Shreds] desired input
 
-        let payload = extract_data_payload_from_shards(data_shreds)
+        let payload = extract_data_payload_from_shards
+            (data_shreds[0..try_smaller_number_of_shreds].to_vec())
             .expect("couldn't zip bytes from shreds");
 
         let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&payload).
-            expect("deserialized_error");
+            expect("didn't work - deserialized_error");
         // assert(deserialized_entries));
         assert_eq!(deserialized_entries.len(), number_of_fake_entries);
         println!("{:#?}", deserialized_entries );
 
+    // FLOW OF SERIALIZATION OF ENTRY ARRAY TO SHREDS
+    // arg - entries: &[Entry],
+    // call fn - let entries = bincode::serialize(entries)?;
+    // pass into fn - &entries[..],
+    // arg -  mut data: &[u8], // Serialized &[Entry]
+    // let chunk_size = DATA_SHREDS_PER_FEC_BLOCK * data_buffer_size;
+    // let mut shreds = Vec::<ShredData>::new();
+    // // Initialize shreds var to hold all shreds
+    //
+    // // This while loop splits the DATA into many shards.But they all have the same
+    // // data header? And the common header changes, but not sure how during the loop.
+    //
+    //
+    // // Then, while the bytes that need to be placed into a shred exist
+    // // and there's enough data left for a chunk
+    // while data.len() >= 2 * chunk_size || data.len() == chunk_size {
+    //     // split off a chunk
+    //     let (chunk, rest) = data.split_at(chunk_size);
+    //     // set the header but I don't know why
+    //     common_header.fec_set_index = common_header.index;
+    //     // this splits the Chunk data, into further chunks of data_buffer_size
+    //     for shred in chunk.chunks(data_buffer_size) {
+    //         // sub_chunk is then turned into a shard
+    //         // which means a chunk is a SHARD_BATCH
+    //         // which means  many shard batches make the DATA
+    //         let shred = crate::shred::merkle::new_shred_data(common_header, data_header, shred);
+    //         shreds.push(shred);
+    //         common_header.index += 1;
+    //     }
+    //     data = rest;
+    // }
+    // fn new_shred_data(
+    //     common_header: ShredCommonHeader,
+    //     mut data_header: DataShredHeader,
+    //     data: &[u8],
+    // ) -> ShredData {
+    //     let size = ShredData::SIZE_OF_HEADERS + data.len();
+    //     let mut payload = vec![0u8; ShredData::SIZE_OF_PAYLOAD];
+    //     payload[ShredData::SIZE_OF_HEADERS..size].copy_from_slice(data);
+    //     data_header.size = size as u16;
+    //     ShredData {
+    //         common_header,
+    //         data_header,
+    //         payload,
+    //     }
+    // }
+
 }
+
+    fn generate_entry_batch_and_shreds(
+        keypair: Arc<Keypair>,
+        slot: Slot,
+        parent_slot: Slot,
+        number_of_fake_entries: i32) -> (Vec<Entry>, Vec<Shred>) {
+        let shredder = Shredder::new(slot, parent_slot, 0, 0).unwrap();
+        // construct entries with fake transactions
+        let entries: Vec<_> = (0..number_of_fake_entries)
+            .map(|_| {
+                let keypair0 = Keypair::new();
+                let keypair1 = Keypair::new();
+                let tx0 =
+                    system_transaction::transfer(&keypair0, &keypair1.pubkey(), 1, Hash::default());
+                Entry::new(&Hash::default(), 1, vec![tx0])
+            })
+            .collect();
+
+        let (data_shreds, _) = shredder.entries_to_shreds(
+            &keypair,
+            &entries,
+            true, // is_last_in_slot
+            0,    // next_shred_index
+            0,    // next_code_index
+            true, // merkle_variant
+            &ReedSolomonCache::default(),
+            &mut ProcessShredsStats::default(),
+        );
+
+        return (entries, data_shreds)
+    }
+
+    #[test]
+    fn test_shred_parse_for_varun() {
+        let keypair = Arc::new(Keypair::new());
+        let slot = 1;
+        let parent_slot = 0;
+        let number_of_fake_entries = 10;
+
+        let (entries, shreds) = generate_entry_batch_and_shreds(
+            keypair, slot, parent_slot, number_of_fake_entries);
+
+        // Now try to take one Shred and extract one entry
+        println!("length of entries {}", entries.len());
+        println!("length of shreds {}", shreds.len());
+
+        let try_smaller_number_of_shreds = 5;
+        // &[Shreds] desired input
+
+        let payload = extract_data_payload_from_shards
+            (shreds[0..try_smaller_number_of_shreds].to_vec())
+            .expect("couldn't zip bytes from shreds");
+
+        let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&payload).
+            expect("didn't work - deserialized_error");
+        // assert(deserialized_entries));
+        assert_eq!((deserialized_entries.len() as i32), number_of_fake_entries);
+        println!("{:#?}", deserialized_entries );
+    }
 
     fn extract_data_payload_from_shards(shreds:Vec<Shred>) -> Result<Vec<u8>, Error>  {
         let arr_shreds = shreds.as_slice();
