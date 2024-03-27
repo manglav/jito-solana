@@ -1608,6 +1608,7 @@ impl Blockstore {
         }
     }
 
+    // THIS IS IMPORTANT - this inserts data shreds into the blockstore
     fn insert_data_shred(
         &self,
         slot_meta: &mut SlotMeta,

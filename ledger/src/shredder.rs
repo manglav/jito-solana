@@ -773,7 +773,7 @@ mod tests {
         let keypair = Arc::new(Keypair::new());
         let slot = 1;
         let parent_slot = 0;
-        let number_of_fake_entries = 10; // with two entries, can fit into one shred
+        let number_of_fake_entries = 15; // with two entries, can fit into one shred
 
         // to generate bytes, bincode::serialize(&[Entry])
         let (entries, shreds) = generate_entry_batch_and_shreds(
@@ -786,11 +786,19 @@ mod tests {
         // Key variable to change for testing.
         // shreds.len() implies the entire batch, so should pass.
         let try_smaller_number_of_shreds = shreds.len();
+        // let try_smaller_number_of_shreds_range = [3..4];
+        let (min_shred_range, max_shred_range) = (0,2);
+
         // &[Shreds] desired input
 
         let payload = extract_data_payload_from_shards
-            (shreds[0..try_smaller_number_of_shreds].to_vec())
+            (shreds[min_shred_range..max_shred_range].to_vec())
             .expect("couldn't zip bytes from shreds");
+
+        let target_entry = &entries[0];
+
+        try_to_extract_one_entry_from_shards(&payload, target_entry);
+
 
         let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&payload).
             expect("didn't work - deserialized_error");
@@ -798,15 +806,51 @@ mod tests {
         assert_eq!((deserialized_entries.len() as i32), number_of_fake_entries);
         println!("{:#?}", deserialized_entries );
 
-
-        let single_entry_payload = bincode::serialize(&entries[0]).unwrap();
+        let single_entry_struct = &entries[0];
+        let single_entry_payload = bincode::serialize(single_entry_struct).unwrap();
         println!("single entry serializes into byte array {:?}", single_entry_payload);
-        println!("all payload entries serializes into byte array {:?}", payload);
+        // println!("all payload entries serializes into byte array {:?}", payload);
 
         // EXTRA DEBUG: Now try to take one Shred and extract one entry
         println!("length of entries {}", &entries.len());
         println!("length of shreds {}", &shreds.len());
 
+    }
+
+    fn try_to_extract_one_entry_from_shards(payload: &Vec<u8>, target_entry: &Entry) {
+        let single_entry_payload = bincode::serialize(&target_entry).unwrap();
+        println!("single entry serializes into byte array {:?}", single_entry_payload);
+        println!("all payload entries serializes into byte array {:?}", payload);
+
+        let max_payload_size = (payload.len() as i32);
+        let min_entry_size = 150;
+        for i in 0..max_payload_size {
+            for j in (i + 1 + min_entry_size)..max_payload_size {
+                // println!("i:{} j {}", i, j);
+                let deserialized_entry  = bincode::deserialize::<Entry>(&payload[(i as usize)..(j as usize)]);
+
+                match deserialized_entry {
+                    Ok(sk) => {
+                        // println!("parsed!");
+                        // println!("match:  serializes into byte array \n{:?}", &payload[(i as usize)..(j as usize)]);
+                        // println!("single entry:  serializes into byte array \n{:?}", &single_entry_payload);
+                        //
+                        // println!("&target_entry:");
+                        // println!("{:?}", target_entry);
+                        // println!("&deserialize_entry:");
+                        // println!("{:?}", sk);
+
+                        let are_they_equal = &sk == target_entry;
+                        if are_they_equal {
+                            println!("AWESOME i:{} j:{} {:?}", i, j, &sk)
+                        }
+                    },
+                    Err(e) => {
+                        // println!("nope")
+                    },
+                }
+            }
+        }
     }
 
     fn extract_data_payload_from_shards(shreds:Vec<Shred>) -> Result<Vec<u8>, Error>  {
