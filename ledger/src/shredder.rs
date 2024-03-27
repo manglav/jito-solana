@@ -787,7 +787,8 @@ mod tests {
         // shreds.len() implies the entire batch, so should pass.
         let try_smaller_number_of_shreds = shreds.len();
         // let try_smaller_number_of_shreds_range = [3..4];
-        let (min_shred_range, max_shred_range) = (0,2);
+        // current max range, 15 => 4 shreds
+        let (min_shred_range, max_shred_range) = (3,4);
 
         // &[Shreds] desired input
 
@@ -795,7 +796,7 @@ mod tests {
             (shreds[min_shred_range..max_shred_range].to_vec())
             .expect("couldn't zip bytes from shreds");
 
-        let target_entry = &entries[0];
+        let target_entry = &entries[14];
 
         try_to_extract_one_entry_from_shards(&payload, target_entry);
 
@@ -817,40 +818,56 @@ mod tests {
 
     }
 
-    fn try_to_extract_one_entry_from_shards(payload: &Vec<u8>, target_entry: &Entry) {
+    fn try_to_extract_one_entry_from_shards(payload: &Vec<u8>, target_entry: &Entry) -> (i32, i32) {
         let single_entry_payload = bincode::serialize(&target_entry).unwrap();
+
         println!("single entry serializes into byte array {:?}", single_entry_payload);
         println!("all payload entries serializes into byte array {:?}", payload);
 
         let max_payload_size = (payload.len() as i32);
         let min_entry_size = 150;
-        for i in 0..max_payload_size {
-            for j in (i + 1 + min_entry_size)..max_payload_size {
+        // for i in 0..max_payload_size {
+        for i in 704..706 {
+                for j in 966..969 {
                 // println!("i:{} j {}", i, j);
-                let deserialized_entry  = bincode::deserialize::<Entry>(&payload[(i as usize)..(j as usize)]);
-
-                match deserialized_entry {
-                    Ok(sk) => {
-                        // println!("parsed!");
-                        // println!("match:  serializes into byte array \n{:?}", &payload[(i as usize)..(j as usize)]);
-                        // println!("single entry:  serializes into byte array \n{:?}", &single_entry_payload);
-                        //
-                        // println!("&target_entry:");
-                        // println!("{:?}", target_entry);
-                        // println!("&deserialize_entry:");
-                        // println!("{:?}", sk);
-
-                        let are_they_equal = &sk == target_entry;
-                        if are_they_equal {
-                            println!("AWESOME i:{} j:{} {:?}", i, j, &sk)
+                    if true {
+                        let partial_payload = &payload[(i as usize)..(j as usize)];
+                        if &single_entry_payload == partial_payload {
+                            let deserialized_entry  = bincode::deserialize::<Entry>(partial_payload);
+                            let obj_check = &deserialized_entry.unwrap() == target_entry;
+                            println!("AWESOME, found at i:{}, j:{}", i, j);
+                            return (i,j);
                         }
-                    },
-                    Err(e) => {
-                        // println!("nope")
-                    },
-                }
+                    }
+
+                    // println!("each_payload {:?}", &payload[(i as usize)..(j as usize)]);
+
+                //     match deserialized_entry {
+                //     Ok(sk) => {
+                //         // println!("parsed!");
+                //         // println!("match:  serializes into byte array \n{:?}", &payload[(i as usize)..(j as usize)]);
+                //         // println!("single entry:  serializes into byte array \n{:?}", &single_entry_payload);
+                //         //
+                //         // println!("&target_entry:");
+                //         // println!("{:?}", target_entry);
+                //         // println!("&deserialize_entry:");
+                //         // println!("{:?}", sk);
+                //         println!("i:{} j:{}", i, j);
+                //
+                //
+                //         let are_they_equal = &sk == target_entry;
+                //         if are_they_equal {
+                //             println!("AWESOME i:{} j:{} {:?}", i, j, &sk)
+                //         }
+                //     },
+                //     Err(e) => {
+                //         println!("error = i:{} j:{}", i, j);
+                //     },
+                // }
             }
         }
+        println!("end loop");
+        return (-1, -1);
     }
 
     fn extract_data_payload_from_shards(shreds:Vec<Shred>) -> Result<Vec<u8>, Error>  {
