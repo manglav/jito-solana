@@ -49,7 +49,6 @@ const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
 pub(crate) struct VarunShredFetchStage {
     thread_hdls: Vec<JoinHandle<()>>,
     varun_shred_cache: Arc<VarunShardDataCache>,
-    batch_complete_receiver: Receiver<(u64, u8)>,
 }
 
 impl VarunShredFetchStage {
@@ -98,12 +97,16 @@ impl VarunShredFetchStage {
                     .filter_map(|s| shred::Shred::new_from_serialized_shred(s).ok())
                     .collect();
 
-                // Start Using the Cache
-                // self.varun_shred_cache.in
-                //////////
 
                 error!("=============Batch Started====={}=====", shreds.len());
                 for (iter_index, shred) in shreds.iter().enumerate() {
+
+
+                    // Start Using the Cache
+                    varun_cache.process_shred(shred.clone());
+                    //////////
+
+
                     let dumped_shred = shred::build_dumped_shred(&shred, packet_batch_index, iter_index, batch_start_time);
                     // error!("index:{}", iter_index);
                     // ShredCode(ShredCode)()
@@ -263,27 +266,39 @@ impl VarunShredFetchStage {
             shred_version,
             "shred_fetch",
             PacketFlags::empty(),
-            varun_shred_cache,
+            varun_shred_cache.clone(),
         );
 
         tvu_threads.push(tvu_filter);
 
         // Turbine shreds fetched over QUIC protocol.
+        // tvu_threads.extend([
+        //     Builder::new()
+        //         .name("solTvuRecvQuic".to_string())
+        //         .spawn(|| {
+        //             varun_receive_quic_datagrams(
+        //                 turbine_quic_endpoint_receiver,
+        //                 recycler,
+        //                 exit,
+        //             )
+        //         })
+        //         .unwrap(),
+        // ]);
+
         tvu_threads.extend([
             Builder::new()
-                .name("solTvuRecvQuic".to_string())
+                .name("solTvuRecvVarunBatch".to_string())
                 .spawn(|| {
-                    varun_receive_quic_datagrams(
-                        turbine_quic_endpoint_receiver,
-                        recycler,
+                    varun_receive_full_packet_batch_signal(
                         exit,
+                        batch_complete_receiver
                     )
                 })
                 .unwrap(),
         ]);
+
         Self {
             thread_hdls: tvu_threads,
-            batch_complete_receiver,
             varun_shred_cache,
         }
     }
@@ -313,6 +328,18 @@ fn varun_should_discard_shred(
     return false
 }
 
+fn varun_receive_full_packet_batch_signal(
+    exit: Arc<AtomicBool>,
+    signal_receiver: Receiver<(u64, u8)>
+) {
+    while !exit.load(Ordering::Relaxed) {
+        let key = match signal_receiver.recv() {
+            Ok(key) => key,
+            Err(RecvError) => continue
+        };
+        println!("cache full batch notifier worked, got key {:?}", key)
+    }
+}
 
 fn varun_receive_quic_datagrams(
     turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,

@@ -42,7 +42,7 @@ impl VarunShardDataCache {
         }
     }
 
-    fn process_shred(&self, shred: Shred) {
+    pub(crate) fn process_shred(&self, shred: Shred) {
         match shred {
             Shred::ShredData(ref data_shred) => {
                 let key = (shred.slot(), data_shred.reference_tick());
