@@ -479,7 +479,7 @@ fn get_fec_set_offsets(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use {
         super::*,
         crate::{
@@ -737,7 +737,7 @@ mod tests {
 
 }
 
-    fn generate_entry_batch_and_shreds(
+    pub fn generate_entry_batch_and_shreds(
         keypair: Arc<Keypair>,
         slot: Slot,
         parent_slot: Slot,
@@ -797,6 +797,11 @@ mod tests {
             .expect("couldn't zip bytes from shreds");
 
         let target_entry = &entries[14];
+        for entry in &entries {
+            let single_entry_payload = bincode::serialize(&entry).unwrap();
+            println!("ALL - single entry serializes into byte array {:?}", single_entry_payload);
+        }
+
 
         try_to_extract_one_entry_from_shards(&payload, target_entry);
 

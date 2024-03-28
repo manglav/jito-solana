@@ -58,6 +58,7 @@ pub mod voting_service;
 pub mod warm_quic_cache_service;
 pub mod window_service;
 mod varun_shred_fetch_stage;
+mod varun_shard_data_cache;
 
 #[macro_use]
 extern crate eager;

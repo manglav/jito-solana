@@ -75,12 +75,12 @@ impl ShredData {
         flags.contains(ShredFlags::LAST_SHRED_IN_SLOT)
     }
 
-    pub(super) fn data_complete(&self) -> bool {
+    pub fn data_complete(&self) -> bool {
         let flags = self.data_header().flags;
         flags.contains(ShredFlags::DATA_COMPLETE_SHRED)
     }
 
-    pub(super) fn reference_tick(&self) -> u8 {
+    pub fn reference_tick(&self) -> u8 {
         let flags = self.data_header().flags;
         (flags & ShredFlags::SHRED_TICK_REFERENCE_MASK).bits()
     }

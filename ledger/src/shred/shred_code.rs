@@ -76,7 +76,7 @@ impl ShredCode {
         ))
     }
 
-    pub(super) fn num_data_shreds(&self) -> u16 {
+    pub fn num_data_shreds(&self) -> u16 {
         self.coding_header().num_data_shreds
     }
 
