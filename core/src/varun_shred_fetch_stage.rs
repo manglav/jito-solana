@@ -42,11 +42,14 @@ use solana_sdk::packet::Packet;
 use solana_sdk::transaction::VersionedTransaction;
 use crate::banking_stage::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use crate::repair::serve_repair::ShredRepairType::Shred;
+use crate::varun_shard_data_cache::VarunShardDataCache;
 
 const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
 
 pub(crate) struct VarunShredFetchStage {
     thread_hdls: Vec<JoinHandle<()>>,
+    varun_shred_cache: Arc<VarunShardDataCache>,
+    batch_complete_receiver: Receiver<(u64, u8)>,
 }
 
 impl VarunShredFetchStage {
@@ -56,6 +59,7 @@ impl VarunShredFetchStage {
         shred_version: u16,
         name: &'static str,
         flags: PacketFlags,
+        varun_cache: Arc<VarunShardDataCache>
     ) {
         // solana_ledger::setup();
         const STATS_SUBMIT_CADENCE: Duration = Duration::from_secs(1);
@@ -93,6 +97,10 @@ impl VarunShredFetchStage {
                     .map(<[u8]>::to_vec)
                     .filter_map(|s| shred::Shred::new_from_serialized_shred(s).ok())
                     .collect();
+
+                // Start Using the Cache
+                // self.varun_shred_cache.in
+                //////////
 
                 error!("=============Batch Started====={}=====", shreds.len());
                 for (iter_index, shred) in shreds.iter().enumerate() {
@@ -204,6 +212,7 @@ impl VarunShredFetchStage {
         shred_version: u16,
         name: &'static str,
         flags: PacketFlags,
+        varun_shred_cache: Arc<VarunShardDataCache>,
     ) -> (Vec<JoinHandle<()>>, JoinHandle<()>) {
         let (packet_sender, packet_receiver) = unbounded();
         let streamers = sockets
@@ -229,6 +238,7 @@ impl VarunShredFetchStage {
                     shred_version,
                     name,
                     flags,
+                    varun_shred_cache
                 )
             })
             .unwrap();
@@ -241,6 +251,8 @@ impl VarunShredFetchStage {
         turbine_quic_endpoint_receiver: Receiver<(Pubkey, SocketAddr, Bytes)>,
         shred_version: u16,
         exit: Arc<AtomicBool>,
+        batch_complete_receiver: Receiver<(u64, u8)>,
+        varun_shred_cache: Arc<VarunShardDataCache>
     ) -> Self {
         let recycler = PacketBatchRecycler::warmed(100, 1024);
 
@@ -251,6 +263,7 @@ impl VarunShredFetchStage {
             shred_version,
             "shred_fetch",
             PacketFlags::empty(),
+            varun_shred_cache,
         );
 
         tvu_threads.push(tvu_filter);
@@ -270,6 +283,8 @@ impl VarunShredFetchStage {
         ]);
         Self {
             thread_hdls: tvu_threads,
+            batch_complete_receiver,
+            varun_shred_cache,
         }
     }
 

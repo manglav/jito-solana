@@ -29,13 +29,13 @@ struct PacketBatch {
     end_data_index: u32,
 }
 
-struct VarunShardDataCache {
+pub(crate) struct VarunShardDataCache {
     packet_batches: DashMap<(u64, u8), PacketBatch>,
     batch_complete_sender: Sender<(u64, u8)>,
 }
 
 impl VarunShardDataCache {
-    fn new(batch_complete_sender: Sender<(u64, u8)>) -> Self {
+    pub(crate) fn new(batch_complete_sender: Sender<(u64, u8)>) -> Self {
         VarunShardDataCache {
             packet_batches: DashMap::new(),
             batch_complete_sender,

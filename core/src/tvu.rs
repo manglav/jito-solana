@@ -19,6 +19,7 @@ use {
         replay_stage::{ReplayStage, ReplayStageConfig},
         rewards_recorder_service::RewardsRecorderSender,
         shred_fetch_stage::ShredFetchStage,
+        varun_shard_data_cache::VarunShardDataCache,
         validator::ProcessBlockStore,
         voting_service::VotingService,
         warm_quic_cache_service::WarmQuicCacheService,
@@ -123,12 +124,17 @@ impl VarunTvu {
             fetch: fetch_sockets,
         } = sockets;
 
+        let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
+        let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
+
         let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
         let fetch_stage = VarunShredFetchStage::new(
             fetch_sockets,
             turbine_quic_endpoint_receiver,
             tvu_config.shred_version,
             exit.clone(),
+            varun_shard_data_cache_receiver,
+            varun_cache
         );
 
         Ok(VarunTvu {
