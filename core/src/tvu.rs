@@ -77,6 +77,7 @@ pub struct Tvu {
 
 pub struct VarunTvu {
     fetch_stage: FastShredFetchStage,
+    shred_sigverify: JoinHandle<()>,
 }
 
 pub struct TvuSockets {
@@ -125,8 +126,8 @@ impl VarunTvu {
             fetch: fetch_sockets,
         } = sockets;
 
-        let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
-        let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
+        // let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
+        // let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
 
         // let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
         // let fetch_stage = VarunShredFetchStage::new(
@@ -148,6 +149,10 @@ impl VarunTvu {
             exit.clone(),
         );
 
+        let shred_sigverify = solana_turbine::clone_sigverify_shreds::clone_spawn_shred_sigverify(
+            fetch_receiver,
+        );
+
         // do something with fetch_receiver
 
 
@@ -155,12 +160,14 @@ impl VarunTvu {
 
         Ok(VarunTvu {
             fetch_stage,
+            shred_sigverify,
         })
     }
 
     pub fn join(self) -> thread::Result<()> {
 
         self.fetch_stage.join()?;
+        self.shred_sigverify.join()?;
         Ok(())
     }
 }

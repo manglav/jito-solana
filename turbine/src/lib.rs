@@ -5,6 +5,7 @@ pub mod cluster_nodes;
 pub mod quic_endpoint;
 pub mod retransmit_stage;
 pub mod sigverify_shreds;
+pub mod clone_sigverify_shreds;
 
 #[macro_use]
 extern crate log;
