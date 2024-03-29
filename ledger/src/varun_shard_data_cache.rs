@@ -49,7 +49,6 @@ impl VarunShardDataCache {
     }
 
     pub fn process_shred(&self, shred: Shred) {
-        println!("in process shred");
         match shred {
             Shred::ShredData(ref data_shred) => {
                 let key = (shred.slot(), data_shred.reference_tick());
@@ -97,11 +96,12 @@ impl VarunShardDataCache {
                 // BUT NOW WE DON'T KNOW IF IT's ACCURATE EVEN IF IT's SET
                 packet_batch.start_data_index = shred.fec_set_index();
 
-                error!("slot: {}, batch_tick: {}, shard_index:{}, fec_index:{}",
+                error!("slot: {}, batch_tick: {}, shard_index:{}, fec_index:{}, last_in_batch:{}",
                     shred.slot(),
                     shred.reference_tick(),
                     shred.index(),
                     shred.fec_set_index(),
+                    shred.data_complete()
                 );
 
                 if shred.data_complete() {
@@ -115,11 +115,13 @@ impl VarunShardDataCache {
                 // if shred.index() > 0 && packet_batch.end_data_index > 0 {
                 // }
 
+
                 if check_completed_batch(&packet_batch) {
                     packet_batch.marked_full.store(true, Ordering::SeqCst);
-                    if self.batch_complete_sender.send(key).is_err() {
-                        println!("Failed to send batch complete signal");
-                    }
+                    println!("cache full batch notifier worked, got key {:?}", key);
+                    // if self.batch_complete_sender.send(key).is_err() {
+                    //     println!("Failed to send batch complete signal");
+                    // }
                 }
 
             }
@@ -165,9 +167,10 @@ impl VarunShardDataCache {
 
                 if check_completed_batch(&packet_batch) {
                     packet_batch.marked_full.store(true, Ordering::SeqCst);
-                    if self.batch_complete_sender.send(key).is_err() {
-                        println!("Failed to send batch complete signal");
-                    }
+                    println!("cache full batch notifier worked, got key {:?}", key);
+                    // if self.batch_complete_sender.send(key).is_err() {
+                    //     println!("Failed to send batch complete signal");
+                    // }
                 }
             }
         }

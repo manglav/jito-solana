@@ -85,7 +85,6 @@ fn clone_run_shred_sigverify<const K: usize>(
     // let now = Instant::now();
     // TODO - SEE WHAT TO DO ABOUT THIS CODE?
     _ = thread_pool.install(|| {
-        println!("inparallel");
         packets
             .par_iter()
             .flatten()
@@ -125,7 +124,6 @@ fn clone_run_shred_sigverify<const K: usize>(
     //     .map(<[u8]>::to_vec)
     //     .collect();
 
-    println!("in sigverify cloned fn");
 
     // retransmit_sender.send(shreds)?;
     // verified_sender.send(packets)?;

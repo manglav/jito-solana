@@ -64,7 +64,6 @@ impl FastShredFetchStage {
                 // }
             }
             // stats.maybe_submit(name, STATS_SUBMIT_CADENCE);
-            println!("got packet in new fast stage");
             if sendr.send(packet_batch).is_err() {
                 println!("got error in sending packet batch");
                 continue;
