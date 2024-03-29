@@ -19,7 +19,6 @@ use {
         replay_stage::{ReplayStage, ReplayStageConfig},
         rewards_recorder_service::RewardsRecorderSender,
         shred_fetch_stage::ShredFetchStage,
-        varun_shard_data_cache::VarunShardDataCache,
         validator::ProcessBlockStore,
         voting_service::VotingService,
         warm_quic_cache_service::WarmQuicCacheService,
@@ -57,6 +56,7 @@ use {
     },
     tokio::sync::mpsc::Sender as AsyncSender,
 };
+use solana_ledger::varun_shard_data_cache::VarunShardDataCache;
 use crate::fast_shred_fetch_stage::FastShredFetchStage;
 use crate::varun_shred_fetch_stage::VarunShredFetchStage;
 
@@ -125,7 +125,7 @@ impl VarunTvu {
         let VarunTvuSockets {
             fetch: fetch_sockets,
         } = sockets;
-
+        //
         // let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
         // let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
 
@@ -140,6 +140,10 @@ impl VarunTvu {
         // );
         //
 
+
+        let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
+        let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
+
         let (fetch_sender, fetch_receiver) = unbounded();
 
         let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
@@ -151,6 +155,7 @@ impl VarunTvu {
 
         let shred_sigverify = solana_turbine::clone_sigverify_shreds::clone_spawn_shred_sigverify(
             fetch_receiver,
+            varun_cache
         );
 
         // do something with fetch_receiver

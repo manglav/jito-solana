@@ -1,3 +1,5 @@
+use crate::shred::{LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shredder};
+use crate::shred::{Shred, ShredData};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -7,15 +9,17 @@ use std::thread;
 use crossbeam::channel::{Receiver, Sender};
 use dashmap::DashMap;
 use dashmap::mapref::one::RefMut;
-use solana_ledger::shred::shred_code::ShredCode;
-use solana_ledger::shred::{LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shred, ShredData, Shredder};
+// use solana_ledger::shred::shred_code::ShredCode;
+// use solana_ledger::shred::{LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shred, ShredData, Shredder};
 use solana_sdk::clock::Slot;
+// use shred:
 
 use solana_entry::entry::Entry;
 use solana_perf::test_tx;
 use solana_sdk::hash::Hash;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signature::Signer;
+use crate::shred::shred_code::ShredCode;
 
 
 const MAX_SLOT_DISTANCE: u64 = 50;
@@ -31,20 +35,21 @@ struct PacketBatch {
     end_data_index: u32,
 }
 
-pub(crate) struct VarunShardDataCache {
+pub struct VarunShardDataCache {
     packet_batches: DashMap<(u64, u8), PacketBatch>,
     batch_complete_sender: Sender<(u64, u8)>,
 }
 
 impl VarunShardDataCache {
-    pub(crate) fn new(batch_complete_sender: Sender<(u64, u8)>) -> Self {
+    pub fn new(batch_complete_sender: Sender<(u64, u8)>) -> Self {
         VarunShardDataCache {
             packet_batches: DashMap::new(),
             batch_complete_sender,
         }
     }
 
-    pub(crate) fn process_shred(&self, shred: Shred) {
+    pub fn process_shred(&self, shred: Shred) {
+        println!("in process shred");
         match shred {
             Shred::ShredData(ref data_shred) => {
                 let key = (shred.slot(), data_shred.reference_tick());

@@ -42,7 +42,7 @@ use solana_sdk::packet::Packet;
 use solana_sdk::transaction::VersionedTransaction;
 use crate::banking_stage::immutable_deserialized_packet::ImmutableDeserializedPacket;
 use crate::repair::serve_repair::ShredRepairType::Shred;
-use crate::varun_shard_data_cache::VarunShardDataCache;
+use solana_ledger::varun_shard_data_cache::VarunShardDataCache;
 
 const PACKET_COALESCE_DURATION: Duration = Duration::from_millis(1);
 

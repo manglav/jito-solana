@@ -29,6 +29,7 @@ pub mod slot_stats;
 mod staking_utils;
 pub mod token_balances;
 pub mod use_snapshot_archives_at_startup;
+pub mod varun_shard_data_cache;
 
 #[macro_use]
 extern crate solana_metrics;

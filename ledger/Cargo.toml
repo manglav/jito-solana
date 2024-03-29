@@ -67,6 +67,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 trees = { workspace = true }
 base64 = "0.21.4"
+crossbeam = "0.8.4"
 
 [dependencies.rocksdb]
 # Avoid the vendored bzip2 within rocksdb-sys that can cause linker conflicts

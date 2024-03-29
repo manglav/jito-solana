@@ -16,6 +16,8 @@ use {
     },
 };
 use solana_ledger::shred::build_dumped_shred;
+use solana_ledger::varun_shard_data_cache;
+use solana_ledger::varun_shard_data_cache::VarunShardDataCache;
 
 const DEDUPER_FALSE_POSITIVE_RATE: f64 = 0.001;
 const DEDUPER_NUM_BITS: u64 = 637_534_199; // 76MB
@@ -30,12 +32,13 @@ enum Error {
 
 pub fn clone_spawn_shred_sigverify(
     shred_fetch_receiver: Receiver<PacketBatch>,
+    varun_shred_cache: Arc<VarunShardDataCache>,
     // retransmit_sender: Sender<Vec</*shred:*/ Vec<u8>>>,
     // verified_sender: Sender<Vec<PacketBatch>>,
 ) -> JoinHandle<()> {
     let thread_pool = ThreadPoolBuilder::new()
         .num_threads(get_thread_count())
-        .thread_name(|i| format!("solSvrfyShred{i:02}"))
+        .thread_name(|i| format!("solCloneSvrfyShred{i:02}"))
         .build()
         .unwrap();
     let run_shred_sigverify = move || {
@@ -48,6 +51,7 @@ pub fn clone_spawn_shred_sigverify(
                 &thread_pool,
                 &deduper,
                 &shred_fetch_receiver,
+                varun_shred_cache.clone()
                 // &retransmit_sender,
                 // &verified_sender,
             ) {
@@ -59,7 +63,7 @@ pub fn clone_spawn_shred_sigverify(
         }
     };
     Builder::new()
-        .name("solShredVerifr".to_string())
+        .name("solClonedShredVerifr".to_string())
         .spawn(run_shred_sigverify)
         .unwrap()
 }
@@ -69,6 +73,7 @@ fn clone_run_shred_sigverify<const K: usize>(
     thread_pool: &ThreadPool,
     deduper: &Deduper<K, [u8]>,
     shred_fetch_receiver: &Receiver<PacketBatch>,
+    varun_shred_cache: Arc<VarunShardDataCache>,
     // retransmit_sender: &Sender<Vec</*shred:*/ Vec<u8>>>,
     // verified_sender: &Sender<Vec<PacketBatch>>,
 ) -> Result<(), Error> {
@@ -80,18 +85,31 @@ fn clone_run_shred_sigverify<const K: usize>(
     // let now = Instant::now();
     // TODO - SEE WHAT TO DO ABOUT THIS CODE?
     _ = thread_pool.install(|| {
+        println!("inparallel");
         packets
-            .par_iter_mut()
+            .par_iter()
             .flatten()
-            .filter(|packet| {
-                !packet.meta().discard()
-                    && packet
-                        .data(..)
-                        .map(|data| deduper.dedup(data))
-                        .unwrap_or(true)
-            })
-            .map(|packet| packet.meta_mut().set_discard(true))
-            .count()
+            // TODO - WHY DOES THIS FILTER THE SHREDS OUT?
+            // .filter(|packet| {
+            //     !packet.meta().discard()
+            //         && packet
+            //             .data(..)
+            //             .map(|data| deduper.dedup(data))
+            //             .unwrap_or(true)
+            // })
+            .filter_map(
+                |packet|
+                    shred::layout::get_shred(packet))
+                    // packet.meta_mut().set_discard(true))
+            .map(<[u8]>::to_vec)
+            .filter_map(|s|shred::Shred::new_from_serialized_shred(s).ok())
+            .for_each(|s| varun_shred_cache.process_shred(s))
+            // .map(|s|build_dumped_shred(&s,0,0,0))
+            // .map(|ds| {
+            //     println!("{:#?}", ds);
+            //     ds
+            // .collect()
+            // })
     });
     // clone_verify_packets(
     //     thread_pool,
@@ -99,13 +117,13 @@ fn clone_run_shred_sigverify<const K: usize>(
     //     &mut packets,
     // );
     // Exclude repair packets from retransmit.
-    let shreds: Vec<_> = packets
-        .iter()
-        .flat_map(PacketBatch::iter)
-        .filter(|packet| !packet.meta().discard() && !packet.meta().repair())
-        .filter_map(shred::layout::get_shred)
-        .map(<[u8]>::to_vec)
-        .collect();
+    // let shreds: Vec<_> = packets
+    //     .iter()
+    //     .flat_map(PacketBatch::iter)
+    //     .filter(|packet| !packet.meta().discard() && !packet.meta().repair())
+    //     .filter_map(shred::layout::get_shred)
+    //     .map(<[u8]>::to_vec)
+    //     .collect();
 
     println!("in sigverify cloned fn");
 
