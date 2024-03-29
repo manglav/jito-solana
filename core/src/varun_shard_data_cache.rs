@@ -19,12 +19,14 @@ use solana_sdk::signature::Signer;
 
 
 const MAX_SLOT_DISTANCE: u64 = 50;
+const UNKNOWN_INDEX: u32 = 999999;
 
 struct PacketBatch {
     data_shreds: BTreeMap<u32, ShredData>,
     code_shreds: BTreeMap<u32, ShredCode>,
     num_data_shreds: Arc<AtomicU32>,
     batch_complete: Arc<AtomicBool>,
+    marked_full: Arc<AtomicBool>,
     start_data_index: u32,
     end_data_index: u32,
 }
@@ -53,26 +55,49 @@ impl VarunShardDataCache {
                     code_shreds: BTreeMap::new(),
                     num_data_shreds: Arc::new(AtomicU32::new(0)),
                     batch_complete: Arc::new(AtomicBool::new(false)),
-                    // TODO, MOVE TO CONSTANT
-                    start_data_index: 999999,
-                    end_data_index: 999999, // end data index can never be 0, so use as marker for unknown
+                    start_data_index: UNKNOWN_INDEX,
+                    end_data_index: UNKNOWN_INDEX, // end data index can never be 0, so use as marker for unknown
+                    marked_full: Arc::new(AtomicBool::new(false)),
                 });
+
+
+                // if shred is already added, skip
+                // if the key already exists in data shreds, no need to re-process
+                if packet_batch.data_shreds.contains_key(&shred.index()) {
+                    return
+                }
 
                 //// CASES
                 // Packet is either the beginning of a batch, middle, or end
                 // Packet can be beginning of slot, or end of slot
                 // A packet batch is complete if you have the beginning, the end, and everything in the middle
 
+
+                // exit early if packet batch is already complete
+                if packet_batch.marked_full.load(Ordering::SeqCst) {
+                    return
+                }
+
+                //
                 // the end of a packet batch is clearly marked
                 // the beginning of a batch is marked via the FEC_Set index - refers to data_index of first
                 // packet in batch.
                 packet_batch.data_shreds.insert(shred.index(), data_shred.clone());
+
+                // when setting start_data_index, should always be the same value
+                if (packet_batch.start_data_index != UNKNOWN_INDEX && packet_batch.start_data_index != shred.fec_set_index()) {
+                    error!("mismatched start_data_index found");
+                }
+                // IMPORTANT - there can be multiple FEC sets per batch tick, so take the minimum value to determine start of batch...
+                // BUT NOW WE DON'T KNOW IF IT's ACCURATE EVEN IF IT's SET
                 packet_batch.start_data_index = shred.fec_set_index();
-                // println!("batch_tick: {}, shard_index:{}, fec_index:{}",
-                //     shred.reference_tick(),
-                //     shred.index(),
-                //     shred.fec_set_index(),
-                // );
+
+                error!("slot: {}, batch_tick: {}, shard_index:{}, fec_index:{}",
+                    shred.slot(),
+                    shred.reference_tick(),
+                    shred.index(),
+                    shred.fec_set_index(),
+                );
 
                 if shred.data_complete() {
                     packet_batch.batch_complete.store(true, Ordering::SeqCst);
@@ -85,7 +110,8 @@ impl VarunShardDataCache {
                 // if shred.index() > 0 && packet_batch.end_data_index > 0 {
                 // }
 
-                if check_completed_batch(packet_batch) {
+                if check_completed_batch(&packet_batch) {
+                    packet_batch.marked_full.store(true, Ordering::SeqCst);
                     if self.batch_complete_sender.send(key).is_err() {
                         println!("Failed to send batch complete signal");
                     }
@@ -94,7 +120,7 @@ impl VarunShardDataCache {
             }
             Shred::ShredCode(ref code_shred) => {
                 // batch tick number is always 63 for coding shreds
-                let key = (shred.slot(), 63);
+                let key = (shred.slot(), shred.reference_tick());
 
                 // Update packet batch information
                 let mut packet_batch = self.packet_batches.entry(key).or_insert(PacketBatch {
@@ -102,14 +128,41 @@ impl VarunShardDataCache {
                     code_shreds: BTreeMap::new(),
                     num_data_shreds: Arc::new(AtomicU32::new(0)),
                     batch_complete: Arc::new(AtomicBool::new(false)),
-                    start_data_index: 999999,
-                    end_data_index: 999999, // end data index can never be 0, so use as marker for unknown
+                    marked_full: Arc::new(AtomicBool::new(false)),
+                    start_data_index: UNKNOWN_INDEX,
+                    end_data_index: UNKNOWN_INDEX, // end data index can never be 0, so use as marker for unknown
                 });
+
+
+                // exit early if packet batch is already complete
+                if packet_batch.marked_full.load(Ordering::SeqCst) {
+                    return
+                }
+
+                // if shred is already added, skip
+                // if the key already exists in data shreds, no need to re-process
+                if packet_batch.code_shreds.contains_key(&shred.index()) {
+                    return
+                }
+
+                //// CASES
+                // Packet is either the beginning of a batch, middle, or end
+                // Packet can be beginning of slot, or end of slot
+                // A packet batch is complete if you have the beginning, the end, and everything in the middle
+
+
                 packet_batch.code_shreds.insert(shred.index(), code_shred.clone());
 
                 // Update the number of data shreds if available
                 if code_shred.num_data_shreds() > 0 {
                     packet_batch.num_data_shreds.store(code_shred.num_data_shreds() as u32, Ordering::SeqCst);
+                }
+
+                if check_completed_batch(&packet_batch) {
+                    packet_batch.marked_full.store(true, Ordering::SeqCst);
+                    if self.batch_complete_sender.send(key).is_err() {
+                        println!("Failed to send batch complete signal");
+                    }
                 }
             }
         }
@@ -122,14 +175,23 @@ impl VarunShardDataCache {
 
 }
 
-fn check_completed_batch(packet_batch: RefMut<(u64, u8), PacketBatch>) -> bool {
+fn check_completed_batch(packet_batch: &RefMut<(u64, u8), PacketBatch>) -> bool {
     // mark packetbatch as "complete" if it has
     // We do care if the packet batch is complete
     // this comparison only works if a code shred is present
     let x:bool = packet_batch.data_shreds.len() == (*packet_batch.num_data_shreds).load(Ordering::SeqCst) as usize;
-    let y:bool = (packet_batch.end_data_index != 999999 && packet_batch.end_data_index != 999999) &&
-        packet_batch.data_shreds.len() == (1usize) + (packet_batch.end_data_index - packet_batch.start_data_index) as usize;
-    (x || y)
+    return x;
+    // check if both indexes are present
+    let y:bool = (packet_batch.end_data_index != UNKNOWN_INDEX && packet_batch.start_data_index != UNKNOWN_INDEX);
+
+    // log both
+    if packet_batch.end_data_index <= packet_batch.start_data_index {
+        error!("index error, end:{} vs start:{}", packet_batch.end_data_index, packet_batch.start_data_index )
+    }
+    let z:bool = packet_batch.data_shreds.len() == (1usize) + (packet_batch.end_data_index - packet_batch.start_data_index) as usize;
+
+
+    (x || (y && z))
 }
 
 

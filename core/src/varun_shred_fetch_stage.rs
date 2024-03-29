@@ -114,7 +114,7 @@ impl VarunShredFetchStage {
                     // error!("{:#?}", &shred.extract_specific_header() );
                     // error!("{:#?}", dumped_shred );
                     wtr.serialize(dumped_shred);
-                    if packet_batch_index > 2000 {
+                    if packet_batch_index > 200000 {
                         wtr.flush();
                         println!("EXITING");
                         process::exit(25);
