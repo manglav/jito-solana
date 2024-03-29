@@ -57,6 +57,7 @@ use {
     },
     tokio::sync::mpsc::Sender as AsyncSender,
 };
+use crate::fast_shred_fetch_stage::FastShredFetchStage;
 use crate::varun_shred_fetch_stage::VarunShredFetchStage;
 
 pub struct Tvu {
@@ -75,7 +76,7 @@ pub struct Tvu {
 }
 
 pub struct VarunTvu {
-    fetch_stage: VarunShredFetchStage,
+    fetch_stage: FastShredFetchStage,
 }
 
 pub struct TvuSockets {
@@ -127,15 +128,30 @@ impl VarunTvu {
         let (varun_shard_data_cache_sender, varun_shard_data_cache_receiver) = crossbeam::channel::unbounded::<(u64, u8)>();
         let varun_cache = Arc::new(VarunShardDataCache::new(varun_shard_data_cache_sender));
 
+        // let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
+        // let fetch_stage = VarunShredFetchStage::new(
+        //     fetch_sockets,
+        //     turbine_quic_endpoint_receiver,
+        //     tvu_config.shred_version,
+        //     exit.clone(),
+        //     varun_shard_data_cache_receiver,
+        //     varun_cache
+        // );
+        //
+
+        let (fetch_sender, fetch_receiver) = unbounded();
+
         let fetch_sockets: Vec<Arc<UdpSocket>> = fetch_sockets.into_iter().map(Arc::new).collect();
-        let fetch_stage = VarunShredFetchStage::new(
+        let fetch_stage = FastShredFetchStage::new(
             fetch_sockets,
-            turbine_quic_endpoint_receiver,
-            tvu_config.shred_version,
+            fetch_sender,
             exit.clone(),
-            varun_shard_data_cache_receiver,
-            varun_cache
         );
+
+        // do something with fetch_receiver
+
+
+
 
         Ok(VarunTvu {
             fetch_stage,

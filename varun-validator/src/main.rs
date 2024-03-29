@@ -3777,9 +3777,8 @@ pub fn main() {
         error!("Failed to start validator: {:?}", e);
         std::process::exit(1);
     });
-    println!("starting tvu");
+    println!("starting varun tvu");
     tvu.join().expect("tvu");
-    println!("test123")
 }
 
 fn process_account_indexes(matches: &ArgMatches) -> AccountSecondaryIndexes {

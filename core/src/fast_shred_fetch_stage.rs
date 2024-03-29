@@ -64,8 +64,10 @@ impl FastShredFetchStage {
                 // }
             }
             // stats.maybe_submit(name, STATS_SUBMIT_CADENCE);
+            println!("got packet in new fast stage");
             if sendr.send(packet_batch).is_err() {
-                break;
+                println!("got error in sending packet batch");
+                continue;
             }
         }
     }
@@ -94,7 +96,7 @@ impl FastShredFetchStage {
             })
             .collect();
         let modifier_hdl = Builder::new()
-            .name("solTvuFetchPMod".to_string())
+            .name("solTvuFastFetchPMod".to_string())
             .spawn(move || {
                 // let repair_context = repair_context
                 //     .as_ref()
