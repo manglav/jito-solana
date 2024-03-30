@@ -827,7 +827,10 @@ pub(super) fn make_shreds_from_data(
         shredder::get_erasure_batch_size(DATA_SHREDS_PER_FEC_BLOCK, is_last_in_slot);
     let proof_size = get_proof_size(erasure_batch_size);
     let data_buffer_size = ShredData::capacity(proof_size)?;
+
+    // Chunk size is PER FEC Block
     let chunk_size = DATA_SHREDS_PER_FEC_BLOCK * data_buffer_size;
+    // Initialize common header, both index and fec_set_index are equal
     let mut common_header = ShredCommonHeader {
         signature: Signature::default(),
         shred_variant: ShredVariant::MerkleData(proof_size),
@@ -837,10 +840,14 @@ pub(super) fn make_shreds_from_data(
         fec_set_index: next_shred_index,
     };
     let data_header = {
+        // Sets offset - seems like a constant
         let parent_offset = slot
             .checked_sub(parent_slot)
             .and_then(|offset| u16::try_from(offset).ok())
             .ok_or(Error::InvalidParentSlot { slot, parent_slot })?;
+        // Sets flags, and first reference of shred tick reference, but takes
+        // min of 63, and input. Ensures hard cap on reference tick.
+        // the question is this constant?
         let flags = ShredFlags::from_bits_retain(
             ShredFlags::SHRED_TICK_REFERENCE_MASK
                 .bits()
@@ -863,6 +870,11 @@ pub(super) fn make_shreds_from_data(
 
     // Then, while the bytes that need to be placed into a shred exist
     // and there's enough data left for a chunk
+    // remember, chunk_size is the size of the data shreds for an FEC set
+    // or said another way, the maximum data an FEC set can handle
+    // This is what sets the fec_index and index.
+
+    // What happens if the data is 1.5 length of chunk size
     while data.len() >= 2 * chunk_size || data.len() == chunk_size {
         // split off a chunk
         let (chunk, rest) = data.split_at(chunk_size);
@@ -879,15 +891,23 @@ pub(super) fn make_shreds_from_data(
         }
         data = rest;
     }
+
     // If shreds.is_empty() then the data argument was empty. In that case we
     // want to generate one data shred with empty data.
+    // if after chunking, there is data leftover, OR no shreds were made,
+    // make a shred with the leftover (or empty) data.
+    // but this code seems to make sure to handle it spilling over into multiple shreds too.
+    // False - the num_data_shreds limits to 1
     if !data.is_empty() || shreds.is_empty() {
         // Find the Merkle proof_size and data_buffer_size
         // which can embed the remaining data.
+
+        // iterates from 1 to 32, to see erasure
         let (proof_size, data_buffer_size) = (1u8..32)
             .find_map(|proof_size| {
                 let data_buffer_size = ShredData::capacity(proof_size).ok()?;
                 let num_data_shreds = (data.len() + data_buffer_size - 1) / data_buffer_size;
+                // limits to 1 shred
                 let num_data_shreds = num_data_shreds.max(1);
                 let erasure_batch_size =
                     shredder::get_erasure_batch_size(num_data_shreds, is_last_in_slot);
@@ -912,13 +932,15 @@ pub(super) fn make_shreds_from_data(
             stats.data_buffer_residual += data_buffer_size - shred.data()?.len();
         }
     }
+
     // Only the very last shred may have residual data buffer.
     debug_assert!(shreds.iter().rev().skip(1).all(|shred| {
         let proof_size = shred.proof_size().unwrap();
         let capacity = ShredData::capacity(proof_size).unwrap();
         shred.data().unwrap().len() == capacity
     }));
-    // Adjust flags for the very last shred.
+
+    // Adjust flags for the very last shred. At this point, all flags are complete.
     if let Some(shred) = shreds.last_mut() {
         shred.data_header.flags |= if is_last_in_slot {
             ShredFlags::LAST_SHRED_IN_SLOT // also implies DATA_COMPLETE_SHRED
@@ -926,6 +948,8 @@ pub(super) fn make_shreds_from_data(
             ShredFlags::DATA_COMPLETE_SHRED
         };
     }
+
+    // at this point, data shreds do not change data, only writing.
     // Write common and data headers into data shreds' payload buffer.
     thread_pool.install(|| {
         shreds.par_iter_mut().try_for_each(|shred| {
@@ -937,7 +961,10 @@ pub(super) fn make_shreds_from_data(
     stats.gen_data_elapsed += now.elapsed().as_micros() as u64;
     stats.record_num_data_shreds(shreds.len());
     let now = Instant::now();
+
+
     // Group shreds by their respective erasure-batch.
+    // This is where coding shreds begin to be created.
     let shreds: Vec<Vec<ShredData>> = shreds
         .into_iter()
         .group_by(|shred| shred.common_header.fec_set_index)

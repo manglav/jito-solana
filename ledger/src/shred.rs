@@ -189,6 +189,7 @@ bitflags! {
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
     pub struct ShredFlags:u8 {
         const SHRED_TICK_REFERENCE_MASK = 0b0011_1111;
+        // This value is 63
 
 
         const DATA_COMPLETE_SHRED       = 0b0100_0000;
