@@ -1,0 +1,89 @@
+[2024-03-30T05:39:07.881165000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 41, log start/end index: 0, 999999
+[2024-03-30T05:39:07.881195000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:5, shred_id: 129, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.881273000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 75, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.881476000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 42, log start/end index: 0, 999999
+[2024-03-30T05:39:07.881845000Z ERROR solana_ledger::varun_shard_data_cache] data complete ShredDump { batch_start_time: 0, shred_parse_time: 1711777147881635, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("RsuIxQTbz52F4Jqh6wyuBih7U5HyUH9YOBeWUXbvuS16/AMBAAEDQJxrWmYWpZ8rHvhntsmHMO8YgPyExsgmYuu4OtkoLSXvPeEg3tghInbJxnn/H215GVeAqkJNdJ+NtSGKM/g3NAdhSB01dHS7fE12JOvTvbPYNV5z0RBD/A2jU4AAAAAALw/GYKp99jtgnnAH+SUxGUMXOpLNt+E00b0DDBYizZkBAgIBAHQMAAAA4PZVDwAAAAAfAR8BHgEdARwBGwEaARkBGAEXARYBFQEUARMBEgERARABDwEOAQ0BDAELAQoBCQEIAQcBBgEFAQQBAwECAQHIV8u23Yth2nsfVGeQMdCJvK21apPe+b7MYJylg1cv/AF7pQdmAAAAAA=="), sc_signature: "3BLW6na6H1TT6TsnoWaQ9fgUBdgv7N46psG1NXAfyQJxuLbpAzhGUgP2CrSH5cbQN42CcxYRkVWyRQBjU8JPKkz1", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(43), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 0, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 2, dats_size: Some(377) }
+
+2 - 43
+so sets 44 to a start_shred
+
+[2024-03-30T05:39:07.881655000Z ERROR solana_ledger::varun_shard_data_cache] data complete ShredDump { batch_start_time: 0, shred_parse_time: 1711777147881449, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("xQ4eGtAYuISIoVsdu9KdtpbQWSBjhXfNwf0o25teo5vr9IL08oHeFYECAwEAAQMpc+e0jg2F2vIU34IYUVV3onoD+gBbz74FlLdKRf8jtzNVPl4tzHR6lrfJR8xoogyP6ibZRhptDjwoRwiX0fKZB2FIHTV0dLt8TXYk69O9s9g1XnPREEP8DaNTgAAAAAAvD8Zgqn32O2CecAf5JTEZQxc6ks234TTRvQMMFiLNmQECAgEAdAwAAADg9lUPAAAAAB8BHwEeAR0BHAEbARoBGQEYARcBFgEVARQBEwESAREBEAEPAQ4BDQEMAQsBCgEJAQgBBwEGAQUBBAEDAQIBAchXy7bdi2Haex9UZ5Ax0Im8rbVqk975vsxgnKWDVy/8AXulB2YAAAAA"), sc_signature: "57uGjaHcR6dZCVNrnzDzAovq7NqpyiaWSgwPcXaLZaqinCtAxKsoiQYbUnfqJdoqTt93jqdKk2ppHj6Fekd4aTKt", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(130), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 84, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 5, dats_size: Some(385) }
+
+5 - 130
+So then sets 131 to a start_shred
+
+[2024-03-30T05:39:07.882239000Z ERROR solana_ledger::varun_shard_data_cache] setting ShredDump { batch_start_time: 0, shred_parse_time: 1711777147882046, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("RsuIxQTbz52F4Jqh6wyuBih7U5HyUH9YOBeWUXbvuS16/AMBAAEDQJxrWmYWpZ8rHvhntsmHMO8YgPyExsgmYuu4OtkoLSXvPeEg3tghInbJxnn/H215GVeAqkJNdJ+NtSGKM/g3NAdhSB01dHS7fE12JOvTvbPYNV5z0RBD/A2jU4AAAAAALw/GYKp99jtgnnAH+SUxGUMXOpLNt+E00b0DDBYizZkBAgIBAHQMAAAA4PZVDwAAAAAfAR8BHgEdARwBGwEaARkBGAEXARYBFQEUARMBEgERARABDwEOAQ0BDAELAQoBCQEIAQcBBgEFAQQBAwECAQHIV8u23Yth2nsfVGeQMdCJvK21apPe+b7MYJylg1cv/AF7pQdmAAAAAA=="), sc_signature: "3BLW6na6H1TT6TsnoWaQ9fgUBdgv7N46psG1NXAfyQJxuLbpAzhGUgP2CrSH5cbQN42CcxYRkVWyRQBjU8JPKkz1", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(43), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 0, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 2, dats_size: Some(377) }
+
+2 - 43, duplicate
+
+[2024-03-30T05:39:07.882410000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 43, log start/end index: 0, 43
+
+[2024-03-30T05:39:07.882357000Z ERROR solana_ledger::varun_shard_data_cache] setting ShredDump { batch_start_time: 0, shred_parse_time: 1711777147882166, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("xQ4eGtAYuISIoVsdu9KdtpbQWSBjhXfNwf0o25teo5vr9IL08oHeFYECAwEAAQMpc+e0jg2F2vIU34IYUVV3onoD+gBbz74FlLdKRf8jtzNVPl4tzHR6lrfJR8xoogyP6ibZRhptDjwoRwiX0fKZB2FIHTV0dLt8TXYk69O9s9g1XnPREEP8DaNTgAAAAAAvD8Zgqn32O2CecAf5JTEZQxc6ks234TTRvQMMFiLNmQECAgEAdAwAAADg9lUPAAAAAB8BHwEeAR0BHAEbARoBGQEYARcBFgEVARQBEwESAREBEAEPAQ4BDQEMAQsBCgEJAQgBBwEGAQUBBAEDAQIBAchXy7bdi2Haex9UZ5Ax0Im8rbVqk975vsxgnKWDVy/8AXulB2YAAAAA"), sc_signature: "57uGjaHcR6dZCVNrnzDzAovq7NqpyiaWSgwPcXaLZaqinCtAxKsoiQYbUnfqJdoqTt93jqdKk2ppHj6Fekd4aTKt", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(130), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 84, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 5, dats_size: Some(385) }
+
+5 - 130, found batch end, duplicate
+
+
+[2024-03-30T05:39:07.882519000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:5, shred_id: 130, log start/end index: 999999, 130
+[2024-03-30T05:39:07.882547000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 76, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.882647000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 77, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.882782000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 78, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.882925000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 79, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.883607000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 80, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.883812000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 81, log start/end index: 999999, 999999
+[2024-03-30T05:39:07.883901000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 82, log start/end index: 999999, 999999
+
+[2024-03-30T05:39:07.884006000Z ERROR solana_ledger::varun_shard_data_cache] startcheck is present  ShredDump { batch_start_time: 0, shred_parse_time: 1711777147882669, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("BQAAAAAAAAABAAAAAAAAAORIO9+Ayv7cqt4boTAeTWnfWCVRVWKp2z4rFlrubMQLAgAAAAAAAAABJOjbaXpMYcc2B9j0VYsjqUrDQALB/fNZSD6qZvTNYlpq9RjA9VqdBVfQ1rR+klCevHMoRAZ91dwu6GEjqBQeAAEAAg6Zm1j+ETCYSmh9cviWm+jFYqYEWv9LSdDNb6qkG87x+BfL10s8S4tu7ikHuOi1fM4qu9ZfsUVwvuu7RTkx7XoOE51eGH/Go0uSvoT5HHx3RR7cSwTSzR4UCSVKp5B/pNtqxMPO+p8Zv1TI3A9eTRzu5TJ9JkgrKdKxPLqkNEchjWsQMjHJdQUM7I2m3kA1fJvKYO+ejzMWWiVWZWUqglM7e/ulDKI3C4wWOeXc3coNaxMNvpBP960D6I5OuOFGpJCKzFtS7SuP36qljQDs9VTUKIgIjbeRQBL8tNsTaiWNX4ypOmwRajec8Fk6V3THktL1OsnrQYKfjr8R23glgg5vl9t+tLU9SvhQNjM2QoGo1fY0EN5Tghha++1IfqzBC8GwSvj1i6o7q00Oryzl99W8MVb+VTp42KCUzbprj6iU3LwSsQUPbSMd8/NowDhLc2Q7KYEnLtjwV0/EsnIVBh3W2/1liOwhBl5PmJUcBeOANtqtwLAD+tmxOMamCtofMK4DBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAA0HUagoLaYTBf4pnDe5mOWEcdsRNQNzEPi+EEWmCvbunudqPoHpC/Gr+om8SrOLR1qswgve7AtSqyMRqEyDoccEDAAFAlDDAAAMAAkDZAAAAAAAAAANCgoLAQcGCAMEBAQHAAMAAAAPAA0FAgUJCQkHAAMAAAAPAAHlX9fuKEURmGc2lrttnMlrrzRAxPpVNDbenGEV/3D3ZRkpmYwqwEDYoPvmGsl7tWYcg1qKpELFfkG5EJLVY2IEAQACBAmtB90MRW0ChtUVYvjWYCIswJ8/b20mskCikBgZGARHvCtXBl7x3WZUML5ga6ZZbAKVMBut74ta/EEBQVD0EnQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVKU1qZKSEGTSTocWDaOHx8NbXdvJK7geQfqEBBBUSNnudqPoHpC/Gr+om8SrOLR1qswgve7AtSqyMRqEyDoccCAgIAAQwCAAAAiBMAAAAAAAADAHpKaXRvIHRyYW5zYWN0aW9uIHByb3h5IFtzaWduYXR1cmU9am9TQUtIeExOV3drSm5ZcGVwRmo5NnNQYnNiQ1Fq"), sc_signature: "5AG7NaQ7Wbgt2nh4s866w7A1wVcvxisFiqnpxD6pug4HfJimtRyzuKR2JieG8fiJbTv8VFrPf2sFZ7BrqtmhTT3U", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(131), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 131, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: false, dats_data_flags_batch_tick: 5, dats_size: Some(1063) }
+
+start check found - 5 - 131, how is it the same batch ID when we got a complete_batch on shard 130? Either Shard 130 is an error, or 131. How to decide?
+
+AHHHH I GOT IT!  IF THE PREVIOUS END BATCH HAD A FULL DATA OR NOT!
+130 had dats_size: Some(385) , so we know the next Shred was incorrect
+So do we drop the incorrect Shred, or keep it for later?
+
+SHOULD THROW AN ERROR HERE
+If the start index contains new_shred_start_index => below_batch_id
+if old_batch_id = shred_start_index.get(current_shred_index),
+    if old_batch_id >= current_batch_id, THROW ERROR
+
+[2024-03-30T05:39:07.884201000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:5, shred_id: 131, log start/end index: 131, 130
+
+[2024-03-30T05:39:07.884160000Z ERROR solana_ledger::varun_shard_data_cache] data complete ShredDump { batch_start_time: 0, shred_parse_time: 1711777147884010, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("9AMACQAJAwtCAQAAAAAACiwVAAEBChkKCwoYEhgTEQECGRsUGAAVFRoYBQgEChcAFg8CAQ4NDBUDEAYHCiflF8uXeuOtKgIAAAAmZAABGmQBAAAoa+4AAAAAAChr7gAAAAAAAAACs7Z+lHnx7QTDe169Vo6p6rXkzpcWpyvFt2KjysdKRmkFX1xmXWEDDF5lcI3mT4NSp7zz8JOWug1H5j0pHClzmnQzCOCn0nhxmTsEnZ+e7wTzoKHx"), sc_signature: "5UwbMU2VWnz1gC7LHJAANVkrvXerEZQsdGkS8krsfx1dv4i4JxKx1p5euekFDBKavjrDACt88KjiiVjhemWZ7TX9", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(83), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 44, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 3, dats_size: Some(274) }
+
+3 - 83
+
+thread 'solCloneSvrfyShred02' panicked at ledger/src/varun_shard_data_cache.rs:269:13:
+attempt to subtract with overflow
+stack backtrace:
+[2024-03-30T05:39:07.884462000Z ERROR solana_ledger::varun_shard_data_cache] setting ShredDump { batch_start_time: 0, shred_parse_time: 1711777147884287, local_packet_batch_received_index: 0, index_in_local_batch: 0, sc_data_in_shred: Some("9AMACQAJAwtCAQAAAAAACiwVAAEBChkKCwoYEhgTEQECGRsUGAAVFRoYBQgEChcAFg8CAQ4NDBUDEAYHCiflF8uXeuOtKgIAAAAmZAABGmQBAAAoa+4AAAAAAChr7gAAAAAAAAACs7Z+lHnx7QTDe169Vo6p6rXkzpcWpyvFt2KjysdKRmkFX1xmXWEDDF5lcI3mT4NSp7zz8JOWug1H5j0pHClzmnQzCOCn0nhxmTsEnZ+e7wTzoKHx"), sc_signature: "5UwbMU2VWnz1gC7LHJAANVkrvXerEZQsdGkS8krsfx1dv4i4JxKx1p5euekFDBKavjrDACt88KjiiVjhemWZ7TX9", sc_variant_type: "MerkleData(7)", sc_slot: 257292032, sc_is_data_type: true, sc_global_data_shred_index_over_slot: Some(83), sc_global_code_shred_index_over_slot: None, sc_shred_version: 50093, sc_fec_set_index: 44, cods_num_data_shreds: None, cods_num_coding_shreds: None, cods_position: None, dats_parent_offset: Some(1), dats_data_flags_block_complete: false, dats_data_flags_batch_complete: true, dats_data_flags_batch_tick: 3, dats_size: Some(274) }
+
+3 - 83 duplicate
+
+[2024-03-30T05:39:07.884585000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 83, log start/end index: 999999, 83
+[2024-03-30T05:39:07.884664000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 61, log start/end index: 999999, 83
+[2024-03-30T05:39:07.884742000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 27, log start/end index: 0, 43
+[2024-03-30T05:39:07.884891000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 62, log start/end index: 999999, 83
+[2024-03-30T05:39:07.885121000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 63, log start/end index: 999999, 83
+[2024-03-30T05:39:07.885215000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 29, log start/end index: 0, 43
+[2024-03-30T05:39:07.885452000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 64, log start/end index: 999999, 83
+[2024-03-30T05:39:07.885555000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 30, log start/end index: 0, 43
+[2024-03-30T05:39:07.885676000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 65, log start/end index: 999999, 83
+[2024-03-30T05:39:07.885796000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 31, log start/end index: 0, 43
+[2024-03-30T05:39:07.885922000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 66, log start/end index: 999999, 83
+[2024-03-30T05:39:07.886048000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 32, log start/end index: 0, 43
+[2024-03-30T05:39:07.886237000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 67, log start/end index: 999999, 83
+[2024-03-30T05:39:07.886323000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 33, log start/end index: 0, 43
+[2024-03-30T05:39:07.886493000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 68, log start/end index: 999999, 83
+[2024-03-30T05:39:07.886633000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:3, shred_id: 69, log start/end index: 999999, 83
+[2024-03-30T05:39:07.886495000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 34, log start/end index: 0, 43
+[2024-03-30T05:39:07.894148000Z ERROR solana_ledger::varun_shard_data_cache] slot_id:257292032, b_id:2, shred_id: 35, log start/end index: 0, 43
+[2024-03-30T05:39:07.894210000Z ERROR solana_ledger::varun_shard_data_cache] cache full batch notifier worked, got key (257292032, 2)
+   0: rust_begin_unwind
+             at /rustc/cc66ad468955717ab92600c770da8c1601a4ff33/library/std/src/panicking.rs:595:5
+   1: core::panicking::panic_fmt
+             at /rustc/cc66ad468955717ab92600c770da8c1601a4ff33/library/core/src/panicking.rs:67:14
+   2: core::panicking::panic
+             at /rustc/cc66ad468955717ab92600c770da8c1601a4ff33/library/core/src/panicking.rs:117:5
+   3: solana_ledger::varun_shard_data_cache::check_completed_batch
+             at ./ledger/src/varun_shard_data_cache.rs:269:13
+   4: solana_ledger::varun_shard_data_cache::VarunShardDataCache::process_shred
+             at ./ledger/src/varun_shard_data_cache.rs:158:24

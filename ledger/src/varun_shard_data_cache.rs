@@ -1,4 +1,4 @@
-use crate::shred::{build_dumped_shred, LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shredder};
+use crate::shred::{build_dumped_shred, DataShredHeader, LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shredder};
 use crate::shred::{Shred, ShredData};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -9,6 +9,7 @@ use std::thread;
 use crossbeam::channel::{Receiver, Sender};
 use dashmap::{DashMap, DashSet};
 use dashmap::mapref::one::RefMut;
+use sha2::digest::typenum::private::IsEqualPrivate;
 // use solana_ledger::shred::shred_code::ShredCode;
 // use solana_ledger::shred::{LEGACY_SHRED_DATA_CAPACITY, max_entries_per_n_shred, ProcessShredsStats, ReedSolomonCache, Shred, ShredData, Shredder};
 use solana_sdk::clock::Slot;
@@ -100,6 +101,7 @@ impl VarunShardDataCache {
 
                 // Update packet batch information
                 // Find or Create PacketBatch
+                /// If this batch id hasn't been seen yet, then create a shred batch
                 let mut packet_batch = self.packet_batches.entry(key).or_insert(PacketBatch {
                     data_shreds: BTreeMap::new(),
                     code_shreds: BTreeMap::new(),
@@ -110,7 +112,7 @@ impl VarunShardDataCache {
                     end_data_index: Arc::new(AtomicU32::new(UNKNOWN_INDEX)), // end data index can never be 0, so use as marker for unknown
                 });
 
-                error!(
+                info!(
                     "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
                     shred.slot(),
                     data_shred.reference_tick(),
@@ -119,15 +121,38 @@ impl VarunShardDataCache {
                     packet_batch.end_data_index.load(Ordering::SeqCst)
                 );
 
+                // Handle Duplicate / Incorrect Shreds
+                // Case 1. Packet batch already completed.
                 // exit early if packet batch is already complete
                 if packet_batch.marked_full.load(Ordering::SeqCst) {
                     return
                 }
 
+                // Case 2.
+                // Shred is exact duplicate of one that already exists.
+
                 // if shred is already added, skip
                 // if the key already exists in data shreds, no need to re-process
                 // Find or Create
-                if packet_batch.data_shreds.contains_key(&shred.index()) {
+                let stored_shred = packet_batch.data_shreds.get(&shred.index());
+
+                if stored_shred.is_some() {
+                    if data_shred == stored_shred.unwrap() {
+                        // duplicate shred! skip
+                        return
+                    }
+                }
+
+                // Case 3 Shred is not exact duplicate, has conflicting data.
+
+                if stored_shred.is_some() {
+                    // Non-duplicate shred for the same index.
+                    // Big time error.
+                    error!("shred copy received with conflicting data - new\
+                    {:?}\
+                    old - {:?}", build_dumped_shred(&shred,0,0,0), data_shred);
+                    // skip for now??
+                    // TODO - determine what to do in this case
                     return
                 }
 
@@ -135,16 +160,10 @@ impl VarunShardDataCache {
                 // the end of a packet batch is clearly marked
                 // the beginning of a batch is marked via the FEC_Set index - refers to data_index of first
                 // packet in batch.
+                ///////////////////////////////////
+                // All changes to the cache should happen at the same time.
 
-                // insert shard
-                packet_batch.data_shreds.insert(shred.index(), data_shred.clone());
-
-                if shred.index() == 0 {
-                    // TODO - check if it's been written already
-                    packet_batch.start_data_index.store(0, Ordering::SeqCst);
-                    // packet_batch.start_data_index = 0
-                }
-
+                // Check if valid shred
                 // check if this is a start shred by using the cache
                 let start_shred_key = (shred.slot(), shred.index());
                 if self.start_check.contains_key(&start_shred_key) {
@@ -152,40 +171,54 @@ impl VarunShardDataCache {
                     // before setting, check if this shred is in the same batch that set
                     // the flag. If they are the same, that's an error - the setter was a packetbatch end,
                     // so the next batch should have it's own reference tick.
-                    let batch_tick_of_setter= self.start_check.get(&start_shred_key).unwrap();
-                    if batch_tick_of_setter == shred.reference_tick() {
-                         error!("Found Shard Error - batch_id is incorrect-\
-                         setter_batch_tick {}, \
-                         start_shred_key: {:?},\
-                         shred: {:?}",
-                            batch_tick_of_setter, start_shred_key, shred);
+                    // TODO - is the pointer dereference an issue? why can't I just read the data
+                    // let batch_tick_of_setter = self.start_check.get(&start_shred_key);// shred.reference_tick());//  get(&start_shred_key).unwrap();
 
-                        error!(
-                            "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
-                            shred.slot(),
-                            data_shred.reference_tick(),
-                            shred.index(),
-                            packet_batch.start_data_index.load(Ordering::SeqCst),
-                            packet_batch.end_data_index.load(Ordering::SeqCst)
-                        );
+                    if let Some(batch_tick_of_setter) = self.start_check.get(&start_shred_key) {
+                        let x = *batch_tick_of_setter;
+                        if x == shred.reference_tick() {
+                            // error!("Found Shard Error - batch_id is incorrect- setter_batch_tick {:?}, ...", x);
+                            error!("Found Shard Error - batch_id is incorrect-\
+                                setter_batch_tick {}, \
+                                start_shred_key: {:?},\
+                                shred: {:?}",
+                                    x, start_shred_key, shred);
+
+                            error!(
+                                "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                shred.slot(),
+                                data_shred.reference_tick(),
+                                shred.index(),
+                                packet_batch.start_data_index.load(Ordering::SeqCst),
+                                packet_batch.end_data_index.load(Ordering::SeqCst)
+                            );
+                            // TODO -- figure out what to do in this case - I assume skip, so it
+                            // should be done before saving it
+                            return
+                        }
+                    }
+
                         // TODO break out of if statement, and re-arrange conditional checks
                         // but check if it works first
                         /// THIS IS THE PART TO DO NEXT.
                         /// I THINK WE SHOULD SPLIT IT INTO A DATA CACHE AND METADATA CACHE.
                         /// WILL MAKE DEBUGGING THINGS LIKE THIS EASIER.
                         /// IF NON DUPLICATE SHARDS COME IN, WOULD HAVE BEEN APPARENT.
+                        /// BUT MAYBE NOT... more tracking and concurrent access requirements
                         /// Slot
                         /// -- BatchTick
-                        /// ----
-                    }
+                        /// ---- FEC Sets
+                        /// ------ Data Shreds / Coding Shreds
+                        ///
+                        /// Batch tick has data_complete, and slot_complete.
 
                     let z = packet_batch.start_data_index.compare_exchange(
                         UNKNOWN_INDEX, shred.index(), Ordering::SeqCst, Ordering::SeqCst
                     );
-                    error!("startcheck is present  {:?}", build_dumped_shred(&shred,0,0,0));
+                    info!("startcheck is present  {:?}", build_dumped_shred(&shred,0,0,0));
                     if z.is_err() {
                         error!(
-                        "CAS-write = slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                        "CAS-write error = slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
                         shred.slot(),
                         data_shred.reference_tick(),
                         shred.index(),
@@ -195,10 +228,48 @@ impl VarunShardDataCache {
                     }
                 }
 
+                // now we know it's a valid consistent shred
+
+                // insert shard
+                packet_batch.data_shreds.insert(shred.index(), data_shred.clone());
+
+                // write start_date_index
+                if shred.index() == 0 {
+                    // TODO - check if it's been written already
+                    packet_batch.start_data_index.store(0, Ordering::SeqCst);
+                    // packet_batch.start_data_index = 0
+                }
+
                 // set batch complete
                 if shred.data_complete() {
-                    error!("data complete {:?}", build_dumped_shred(&shred,0,0,0));
+                    info!("data complete {:?}", build_dumped_shred(&shred,0,0,0));
+
+                    // Assumption here that would only set this once for a given batch, but getting weird data.
+                    if packet_batch.batch_complete.load(Ordering::SeqCst) == true {
+                        error!(
+                                "trying to set data complete again.\
+                                slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                shred.slot(),
+                                data_shred.reference_tick(),
+                                shred.index(),
+                                packet_batch.start_data_index.load(Ordering::SeqCst),
+                                packet_batch.end_data_index.load(Ordering::SeqCst)
+                            );
+                    }
                     packet_batch.batch_complete.store(true, Ordering::SeqCst);
+
+                    if packet_batch.end_data_index.load(Ordering::SeqCst) != UNKNOWN_INDEX {
+                        error!(
+                                "trying to set end_data_index again.\
+                                slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                shred.slot(),
+                                data_shred.reference_tick(),
+                                shred.index(),
+                                packet_batch.start_data_index.load(Ordering::SeqCst),
+                                packet_batch.end_data_index.load(Ordering::SeqCst)
+                            );
+                    }
+
                     packet_batch.end_data_index.store(shred.index(), Ordering::SeqCst);
 
                     // if not the end of the block, then save to cache
@@ -207,9 +278,9 @@ impl VarunShardDataCache {
                         let key = (shred.slot(), shred.index() + 1);
                         if self.start_check.contains_key(&key) {
                             error!("shred: {:?}", build_dumped_shred(&shred,0,0,0));
-                            panic!("this should never be written twice");
+                            error!("this should never be written twice");
                         } else {
-                            error!("setting {:?}", build_dumped_shred(&shred,0,0,0));
+                            info!("setting {:?}", build_dumped_shred(&shred,0,0,0));
                             self.start_check.insert(key, shred.reference_tick());
                         }
                     }
@@ -218,10 +289,10 @@ impl VarunShardDataCache {
                 if check_completed_batch(&packet_batch) {
                     if packet_batch.marked_full.load(Ordering::SeqCst) {
                         error!("shred: {:?}", build_dumped_shred(&shred,0,0,0));
-                        panic!("this check completed failed. if it's full already, should have already exited");
+                        error!("this check completed failed. if it's full already, should have already exited");
                     }
                     packet_batch.marked_full.store(true, Ordering::SeqCst);
-                    error!("cache full batch notifier worked, got key {:?}", key);
+                    info!("cache full batch notifier worked, got key {:?}", key);
                     // if self.batch_complete_sender.send(key).is_err() {
                     //     println!("Failed to send batch complete signal");
                     // }
@@ -307,8 +378,70 @@ impl VarunShardDataCache {
         self.packet_batches.retain(|&(slot, _), _| current_slot - slot <= MAX_SLOT_DISTANCE);
     }
 
+    // fn check_valid_start_shred(&self, shred: Shred, data_shred: DataShred) {
+    //
+    //     // check if this is a start shred by using the cache
+    //     let start_shred_key = (shred.slot(), shred.index());
+    //     if self.start_check.contains_key(&start_shred_key) {
+    //
+    //         // before setting, check if this shred is in the same batch that set
+    //         // the flag. If they are the same, that's an error - the setter was a packetbatch end,
+    //         // so the next batch should have it's own reference tick.
+    //         // TODO - is the pointer dereference an issue? why can't I just read the data
+    //         let batch_tick_of_setter = *self.start_check.get(&start_shred_key);// shred.reference_tick());//  get(&start_shred_key).unwrap();
+    //         if batch_tick_of_setter == shred.reference_tick() {
+    //             error!("Found Shard Error - batch_id is incorrect-\
+    //                      setter_batch_tick {}, \
+    //                      start_shred_key: {:?},\
+    //                      shred: {:?}",
+    //                         batch_tick_of_setter, start_shred_key, shred);
+    //
+    //             error!(
+    //                         "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+    //                         shred.slot(),
+    //                         data_shred.reference_tick(),
+    //                         shred.index(),
+    //                         packet_batch.start_data_index.load(Ordering::SeqCst),
+    //                         packet_batch.end_data_index.load(Ordering::SeqCst)
+    //                     );
+    //             // TODO break out of if statement, and re-arrange conditional checks
+    //             // but check if it works first
+    //             /// THIS IS THE PART TO DO NEXT.
+    //             /// I THINK WE SHOULD SPLIT IT INTO A DATA CACHE AND METADATA CACHE.
+    //             /// WILL MAKE DEBUGGING THINGS LIKE THIS EASIER.
+    //             /// IF NON DUPLICATE SHARDS COME IN, WOULD HAVE BEEN APPARENT.
+    //             /// BUT MAYBE NOT... more tracking and concurrent access requirements
+    //             /// Slot
+    //             /// -- BatchTick
+    //             /// ---- FEC Sets
+    //             /// ------ Data Shreds / Coding Shreds
+    //             ///
+    //             /// Batch tick has data_complete, and slot_complete.
+    //             let x = 1;
+    //             // TODO - how to unwind this?
+    //             //return
+    //         }
+    //
+    //         let z = packet_batch.start_data_index.compare_exchange(
+    //             UNKNOWN_INDEX, shred.index(), Ordering::SeqCst, Ordering::SeqCst
+    //         );
+    //         error!("startcheck is present  {:?}", build_dumped_shred(&shred,0,0,0));
+    //         if z.is_err() {
+    //             error!(
+    //                     "CAS-write = slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+    //                     shred.slot(),
+    //                     data_shred.reference_tick(),
+    //                     shred.index(),
+    //                     packet_batch.start_data_index.load(Ordering::SeqCst),
+    //                     packet_batch.end_data_index.load(Ordering::SeqCst)
+    //                     );
+    //         }
+    //     }
+    // }
 
 }
+
+
 
 fn check_completed_batch(packet_batch: &RefMut<(u64, u8), PacketBatch>) -> bool {
     // mark packetbatch as "complete" if it has

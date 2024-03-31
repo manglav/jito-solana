@@ -773,12 +773,15 @@ pub mod tests {
         let keypair = Arc::new(Keypair::new());
         let slot = 1;
         let parent_slot = 0;
-        let number_of_fake_entries = 15; // with two entries, can fit into one shred
+        let number_of_fake_entries = 400; // with two entries, can fit into one shred
 
         // to generate bytes, bincode::serialize(&[Entry])
         let (entries, shreds) = generate_entry_batch_and_shreds(
             keypair, slot, parent_slot, number_of_fake_entries);
 
+        for shred in shreds.iter() {
+            println!("b:{}, fec:{}, c:{}", shred.reference_tick(), shred.fec_set_index(), shred.data_complete())
+        }
         // Now try to take one Shred and extract one entry
         println!("length of entries {}", entries.len());
         println!("length of shreds {}", shreds.len());
