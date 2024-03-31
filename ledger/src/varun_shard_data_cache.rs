@@ -320,7 +320,18 @@ impl VarunShardDataCache {
                         error!("this check completed failed. if it's full already, should have already exited");
                     }
                     packet_batch.marked_full.store(true, Ordering::SeqCst);
-                    info!("cache full batch notifier worked, got key {:?}", key);
+                    // error!("cache full batch notifier worked, got key {:?}", key);
+                    error!(
+                        "cache full batch notifier worked, got key {:?} - \
+                        slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
+                        key,
+                        shred.slot(),
+                        data_shred.reference_tick(),
+                        shred.index(),
+                        shred.fec_set_index(),
+                        packet_batch.start_data_index.load(Ordering::SeqCst),
+                        packet_batch.end_data_index.load(Ordering::SeqCst)
+                    );
                     let mut shreds: Vec<Shred> = vec![];
                     // get vector of shreds
                     /// THIS ISN'T WORKING AS EXPECTED
@@ -501,16 +512,17 @@ fn deshred_and_print(data_shreds: Vec<Shred>) {
         }
     };
 
-    // let deshred_payload = Shredder::deshred(&data_shreds).unwrap();
-    let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&deshred_payload);
-
     // checks if all entries in entry batch, have been turned to shreds, and turned back to entries
-    if let Ok(deserialized_entries) = deserialized_entries {
-        info!("Checking entries");
-        info!("{:?}", deserialized_entries)
-    } else {
-        panic!("uhoh");
-    }
+    let deserialized_entries  = match bincode::deserialize::<Vec<Entry>>(&deshred_payload) {
+        Ok(entries) => {
+            info!("Checking entries");
+            info!("{:?}", entries)
+        },
+        Err(e) => {
+            error!("error deserializing data: {}", e);
+            return;
+        }
+    };
 }
 
 
