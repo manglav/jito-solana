@@ -58,6 +58,29 @@ use crate::shred::shred_code::ShredCode;
 const MAX_SLOT_DISTANCE: u64 = 50;
 const UNKNOWN_INDEX: u32 = 999999;
 
+
+/// Shredstore stores all shreds from their slot + index as a key
+/// It stores both types of shreds, code and data for use later
+struct ShredStore {
+    // slot ID + Respective Index
+    data_shreds: DashMap<(u64, u32), ShredData>,
+    code_shreds: DashMap<(u64, u32), ShredCode>,
+}
+/// metadata store stores data on the fec data sets
+/// Slot ID  -> BatchTick -> FEC Start Index
+// struct ShredStoreMetadata {
+//     packet_batches: DashMap<(u64, u8, u32), FecBatchMetadata>,
+//
+// }
+
+// /// What attributes does a packet batch have?
+// struct FecBatchMetadata {
+//     start_index:,
+//     end_index,
+//     marked_full
+//
+// }
+
 struct PacketBatch {
     data_shreds: BTreeMap<u32, ShredData>,
     code_shreds: BTreeMap<u32, ShredCode>,
@@ -113,10 +136,11 @@ impl VarunShardDataCache {
                 });
 
                 info!(
-                    "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                    "slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
                     shred.slot(),
                     data_shred.reference_tick(),
                     shred.index(),
+                    shred.fec_set_index(),
                     packet_batch.start_data_index.load(Ordering::SeqCst),
                     packet_batch.end_data_index.load(Ordering::SeqCst)
                 );
@@ -185,10 +209,11 @@ impl VarunShardDataCache {
                                     x, start_shred_key, shred);
 
                             error!(
-                                "slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                "slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
                                 shred.slot(),
                                 data_shred.reference_tick(),
                                 shred.index(),
+                                shred.fec_set_index(),
                                 packet_batch.start_data_index.load(Ordering::SeqCst),
                                 packet_batch.end_data_index.load(Ordering::SeqCst)
                             );
@@ -218,10 +243,11 @@ impl VarunShardDataCache {
                     info!("startcheck is present  {:?}", build_dumped_shred(&shred,0,0,0));
                     if z.is_err() {
                         error!(
-                        "CAS-write error = slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                        "CAS-write error = slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
                         shred.slot(),
                         data_shred.reference_tick(),
                         shred.index(),
+                        shred.fec_set_index(),
                         packet_batch.start_data_index.load(Ordering::SeqCst),
                         packet_batch.end_data_index.load(Ordering::SeqCst)
                         );
@@ -248,10 +274,11 @@ impl VarunShardDataCache {
                     if packet_batch.batch_complete.load(Ordering::SeqCst) == true {
                         error!(
                                 "trying to set data complete again.\
-                                slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
                                 shred.slot(),
                                 data_shred.reference_tick(),
                                 shred.index(),
+                                shred.fec_set_index(),
                                 packet_batch.start_data_index.load(Ordering::SeqCst),
                                 packet_batch.end_data_index.load(Ordering::SeqCst)
                             );
@@ -261,10 +288,11 @@ impl VarunShardDataCache {
                     if packet_batch.end_data_index.load(Ordering::SeqCst) != UNKNOWN_INDEX {
                         error!(
                                 "trying to set end_data_index again.\
-                                slot_id:{}, b_id:{}, shred_id: {}, log start/end index: {}, {}",
+                                slot_id:{}, b_id:{}, shred_id: {}, fec:{}, log start/end index: {}, {}",
                                 shred.slot(),
                                 data_shred.reference_tick(),
                                 shred.index(),
+                                shred.fec_set_index(),
                                 packet_batch.start_data_index.load(Ordering::SeqCst),
                                 packet_batch.end_data_index.load(Ordering::SeqCst)
                             );
@@ -293,6 +321,27 @@ impl VarunShardDataCache {
                     }
                     packet_batch.marked_full.store(true, Ordering::SeqCst);
                     info!("cache full batch notifier worked, got key {:?}", key);
+                    let mut shreds: Vec<Shred> = vec![];
+                    // get vector of shreds
+                    /// THIS ISN'T WORKING AS EXPECTED
+                    for (_, data_shred) in packet_batch.data_shreds.iter() {
+                        shreds.push(Shred::ShredData(data_shred.clone()));
+                    }
+                    // let _ = packet_batch.data_shreds.iter().map(
+                    //     |(_,data_shred)| shreds.push(Shred::ShredData(data_shred.clone()))
+                    // );
+
+                    for shred in shreds.iter() {
+                        let x = build_dumped_shred(shred,0,0,0);
+                        info!("{:?}", x)
+                    }
+
+
+                    // {
+                    //     shreds.push(Shred::ShredData(shred_data.clone()))
+                    // };
+
+                    deshred_and_print(shreds)
                     // if self.batch_complete_sender.send(key).is_err() {
                     //     println!("Failed to send batch complete signal");
                     // }
@@ -441,6 +490,28 @@ impl VarunShardDataCache {
 
 }
 
+fn deshred_and_print(data_shreds: Vec<Shred>) {
+    // Deshreds ALL of the shreds.
+    let deshred_payload = match Shredder::deshred(&data_shreds) {
+        Ok(payload) => payload,
+        Err(e) => {
+            // Handle the error, for example, by logging or returning a default value
+            error!("Error deshredding data: {}", e);
+            return; // Or use a default value, or propagate the error up
+        }
+    };
+
+    // let deshred_payload = Shredder::deshred(&data_shreds).unwrap();
+    let deserialized_entries  = bincode::deserialize::<Vec<Entry>>(&deshred_payload);
+
+    // checks if all entries in entry batch, have been turned to shreds, and turned back to entries
+    if let Ok(deserialized_entries) = deserialized_entries {
+        info!("Checking entries");
+        info!("{:?}", deserialized_entries)
+    } else {
+        panic!("uhoh");
+    }
+}
 
 
 fn check_completed_batch(packet_batch: &RefMut<(u64, u8), PacketBatch>) -> bool {

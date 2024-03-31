@@ -475,7 +475,7 @@ pub fn main123() {
     // RUST_LOG=info,solana-metrics=warn
     // NOT WORKING TODO
     let key = "RUST_LOG";
-    env::set_var(key, "info,solana-metrics=warn");
+    env::set_var(key, "warn,solana-metrics=warn");
     let default_args = DefaultArgs::new();
     let solana_version = solana_version::version!();
     let cli_app = app(solana_version, &default_args);
@@ -2135,7 +2135,7 @@ pub fn main() {
     // RUST_LOG=info,solana-metrics=warn
     // NOT WORKING TODO
     let key = "RUST_LOG";
-    env::set_var(key, "info,solana-metrics=warn");
+    env::set_var(key, "warn,solana-metrics=warn");
     let default_args = DefaultArgs::new();
     let solana_version = solana_version::version!();
     let cli_app = app(solana_version, &default_args);
